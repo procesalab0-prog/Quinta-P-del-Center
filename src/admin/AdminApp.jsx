@@ -9,6 +9,7 @@ import Dashboard from './Dashboard.jsx'
 import Config from './Config.jsx'
 import { IconScan, IconCalendarSm, IconUsers, IconTrophy, IconChart, IconGear } from '../components/Icons.jsx'
 import ErrorBoundary from '../components/ErrorBoundary.jsx'
+import { useTapEgg, EasterEggModal } from '../components/EasterEgg.jsx'
 
 const NAV = [
   { id: 'scanner', label: 'Escáner', Icon: IconScan },
@@ -23,6 +24,7 @@ export default function AdminApp() {
   const { session, profile } = useAuth()
   const [screen, setScreen] = useState('scanner')
   const [collapsed, setCollapsed] = useState(false)
+  const egg = useTapEgg(6)
 
   if (session === undefined || (session && !profile)) {
     return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--faint)' }}>Cargando…</div>
@@ -50,7 +52,8 @@ export default function AdminApp() {
           height: 64, display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px',
           borderBottom: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
         }}>
-          <img src="/assets/logo-mark-black.jpeg" alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+          <img src="/assets/logo-mark-black.jpeg" alt="" onClick={(e) => { e.stopPropagation(); egg.onTap() }}
+            style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
           <div className="side-brand-label oswald" style={{ fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>Quinta</div>
         </div>
         <div style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -76,6 +79,7 @@ export default function AdminApp() {
           {screen === 'config' && <Config isAdmin={profile.role === 'admin'} />}
         </ErrorBoundary>
       </main>
+      <EasterEggModal open={egg.open} onClose={egg.close} />
     </div>
   )
 }

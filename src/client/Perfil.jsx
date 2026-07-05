@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth.jsx'
 import { initials, LEVEL_LABEL, LEVEL_BG, fmtDateShort } from '../lib/util'
+import { useTapEgg, EasterEggModal } from '../components/EasterEgg.jsx'
 
 export default function Perfil() {
   const { session, profile, refreshProfile } = useAuth()
@@ -9,6 +10,7 @@ export default function Perfil() {
   const [events, setEvents] = useState([])
   const [form, setForm] = useState({ full_name: '', phone: '', play_category: '' })
   const [saved, setSaved] = useState(false)
+  const egg = useTapEgg(6)
 
   useEffect(() => {
     if (profile) setForm({ full_name: profile.full_name ?? '', phone: profile.phone ?? '', play_category: profile.play_category ?? '' })
@@ -88,7 +90,8 @@ export default function Perfil() {
     <div style={{ animation: 'qpc-fadein 0.25s ease' }}>
       <div className="h-page" style={{ marginBottom: 18 }}>Perfil</div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22 }}>
-        <div className="avatar-circle" style={{ width: 76, height: 76, fontSize: 24, border: '2px solid var(--lime)', marginBottom: 10 }}>
+        <div className="avatar-circle" onClick={egg.onTap}
+          style={{ width: 76, height: 76, fontSize: 24, border: '2px solid var(--lime)', marginBottom: 10, cursor: 'pointer', userSelect: 'none' }}>
           {initials(profile.full_name)}
         </div>
         <div style={{ fontWeight: 600, fontSize: 17 }}>{profile.full_name}</div>
@@ -105,6 +108,7 @@ export default function Perfil() {
       </div>
 
       <button className="btn-danger-outline" onClick={() => supabase.auth.signOut()}>Cerrar sesión</button>
+      <EasterEggModal open={egg.open} onClose={egg.close} />
     </div>
   )
 }
