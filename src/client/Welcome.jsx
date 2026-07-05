@@ -62,7 +62,11 @@ export default function Welcome() {
             {view === 'signup' && (
               <>
                 <input className="input" placeholder="Nombre completo" value={form.name} onChange={set('name')} required />
-                <input className="input" placeholder="Teléfono" type="tel" value={form.phone} onChange={set('phone')} />
+                <input className="input" placeholder="Celular (10 dígitos, con WhatsApp)" type="tel" value={form.phone} onChange={set('phone')}
+                  required pattern="[0-9\s+\-]{10,15}" title="Escribe tu celular a 10 dígitos" inputMode="numeric" />
+                <div style={{ fontSize: 11, color: '#C9CDC4', marginTop: -4 }}>
+                  Lo usaremos para avisarte de tus reservas y torneos.
+                </div>
               </>
             )}
             <input className="input" placeholder="Correo electrónico" type="email" value={form.email} onChange={set('email')} required autoComplete="email" />

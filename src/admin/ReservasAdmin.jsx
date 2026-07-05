@@ -10,8 +10,12 @@ export default function ReservasAdmin() {
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
 
+  const [socios, setSocios] = useState([])
+
   useEffect(() => {
     supabase.from('courts').select('*').eq('is_active', true).order('id').then(({ data }) => setCourts(data ?? []))
+    supabase.from('profiles').select('id, full_name, phone').eq('is_active', true).order('full_name')
+      .then(({ data }) => setSocios(data ?? []))
   }, [])
 
   async function load() {
@@ -44,7 +48,7 @@ export default function ReservasAdmin() {
 
   function openNew(courtId, hour) {
     setError('')
-    setDrawer({ mode: 'new', data: { court_id: courtId ?? courts[0]?.id, hour: hour ?? HOURS[0], customer_name: '', is_paid: false, status: 'confirmed' } })
+    setDrawer({ mode: 'new', data: { court_id: courtId ?? courts[0]?.id, hour: hour ?? HOURS[0], member_id: null, customer_name: '', is_paid: false, status: 'confirmed' } })
   }
   function openEdit(r) {
     setError('')
@@ -55,19 +59,18 @@ export default function ReservasAdmin() {
     setError('')
     const d = drawer.data
     const { start, end } = slotDates(day, d.hour)
+    const row = {
+      court_id: d.court_id,
+      member_id: d.member_id || null,
+      customer_name: d.member_id ? null : (d.customer_name?.trim() || 'Reserva'),
+      starts_at: start.toISOString(), ends_at: end.toISOString(),
+      status: d.status, is_paid: d.is_paid,
+    }
     if (drawer.mode === 'new') {
-      const { error } = await supabase.from('reservations').insert({
-        court_id: d.court_id, customer_name: d.customer_name.trim() || 'Reserva',
-        starts_at: start.toISOString(), ends_at: end.toISOString(),
-        status: d.status, is_paid: d.is_paid,
-      })
+      const { error } = await supabase.from('reservations').insert(row)
       if (error) { setError(msgError(error)); return }
     } else {
-      const { error } = await supabase.from('reservations').update({
-        court_id: d.court_id, customer_name: d.customer_name,
-        starts_at: start.toISOString(), ends_at: end.toISOString(),
-        status: d.status, is_paid: d.is_paid,
-      }).eq('id', d.id)
+      const { error } = await supabase.from('reservations').update(row).eq('id', d.id)
       if (error) { setError(msgError(error)); return }
     }
     setDrawer(null); load()
@@ -111,10 +114,23 @@ export default function ReservasAdmin() {
           <div className="drawer">
             <div className="h-section" style={{ marginBottom: 16 }}>{drawer.mode === 'new' ? 'Nueva reserva' : 'Editar reserva'}</div>
 
-            <div className="field-label">Cliente</div>
-            <input className="input" style={{ marginBottom: 14 }} placeholder="Nombre del socio o cliente"
-              value={d.customer_name ?? d.profiles?.full_name ?? ''}
-              onChange={e => setDrawer(dr => ({ ...dr, data: { ...dr.data, customer_name: e.target.value } }))} />
+            <div className="field-label">Socio registrado</div>
+            <select className="input" style={{ marginBottom: 14 }} value={d.member_id ?? ''}
+              onChange={e => setDrawer(dr => ({ ...dr, data: { ...dr.data, member_id: e.target.value || null } }))}>
+              <option value="">— Cliente externo (sin cuenta) —</option>
+              {socios.map(s => (
+                <option key={s.id} value={s.id}>{s.full_name || '(sin nombre)'}{s.phone ? ` · ${s.phone}` : ''}</option>
+              ))}
+            </select>
+
+            {!d.member_id && (
+              <>
+                <div className="field-label">Nombre del cliente externo</div>
+                <input className="input" style={{ marginBottom: 14 }} placeholder="Ej. Juan Pérez (mostrador)"
+                  value={d.customer_name ?? ''}
+                  onChange={e => setDrawer(dr => ({ ...dr, data: { ...dr.data, customer_name: e.target.value } }))} />
+              </>
+            )}
 
             <div className="field-label">Cancha</div>
             <select className="input" style={{ marginBottom: 14 }} value={d.court_id}

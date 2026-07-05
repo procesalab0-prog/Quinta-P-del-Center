@@ -332,6 +332,8 @@ create policy "ver mis reservas o staff" on public.reservations
   for select using (member_id = auth.uid() or public.is_staff());
 create policy "solicitar mi reserva" on public.reservations
   for insert with check (member_id = auth.uid() and status = 'pending');
+create policy "staff crea reservas" on public.reservations
+  for insert with check (public.is_staff());
 create policy "staff administra reservas" on public.reservations
   for update using (public.is_staff());
 create policy "staff elimina reservas" on public.reservations
