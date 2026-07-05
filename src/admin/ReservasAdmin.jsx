@@ -8,6 +8,7 @@ export default function ReservasAdmin() {
   const [reservas, setReservas] = useState([])
   const [drawer, setDrawer] = useState(null) // {mode:'new'|'edit', data:{...}}
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     supabase.from('courts').select('*').eq('is_active', true).order('id').then(({ data }) => setCourts(data ?? []))
@@ -15,11 +16,15 @@ export default function ReservasAdmin() {
 
   async function load() {
     const [fromISO, toISO] = dayRangeISO(day)
-    const { data } = await supabase.from('reservations')
-      .select('*, profiles(full_name)')
+    // reservations tiene dos FKs hacia profiles (member_id y created_by):
+    // hay que nombrar la relación o PostgREST rechaza la consulta entera.
+    const { data, error } = await supabase.from('reservations')
+      .select('*, profiles!reservations_member_id_fkey(full_name)')
       .gte('starts_at', fromISO).lt('starts_at', toISO)
       .neq('status', 'cancelled')
       .order('starts_at')
+    if (error) { setLoadError('No se pudieron cargar las reservas: ' + error.message); return }
+    setLoadError('')
     setReservas(data ?? [])
   }
   useEffect(() => { load() }, [day])
@@ -85,6 +90,8 @@ export default function ReservasAdmin() {
         <button className="btn-lime" style={{ width: 'auto', padding: '9px 16px', borderRadius: 8, fontSize: 13, fontFamily: 'Inter', textTransform: 'none', letterSpacing: 0 }}
           onClick={() => openNew()}>+ Nueva reserva</button>
       </div>
+
+      {loadError && <div className="error-note" style={{ marginBottom: 12 }}>{loadError}</div>}
 
       <div style={{ overflowX: 'auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${courts.length}, minmax(110px, 1fr))`, gap: 6, minWidth: courts.length * 120 + 70 }}>
