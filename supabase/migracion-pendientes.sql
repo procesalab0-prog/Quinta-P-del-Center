@@ -60,5 +60,9 @@ create policy "cada quien sube su avatar" on storage.objects
 create policy "cada quien actualiza su avatar" on storage.objects
   for update using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- 6) Fecha de fin de promo en avisos (para la cuenta regresiva)
+alter table public.announcements
+  add column if not exists expires_at timestamptz;
+
 -- Listo. Si el paso 5 marca error de bucket, crea primero los buckets
 -- en Storage y vuelve a correr solo el paso 5.

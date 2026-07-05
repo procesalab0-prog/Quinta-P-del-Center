@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { MONTH_SHORT, timeAgo } from '../lib/util'
+import Countdown from '../components/Countdown.jsx'
 
-export default function Inicio({ goTo }) {
+export default function Inicio({ goTo, openDetail }) {
   const [featured, setFeatured] = useState(null)
   const [avisos, setAvisos] = useState([])
   const [courtCount, setCourtCount] = useState(null)
@@ -43,17 +44,21 @@ export default function Inicio({ goTo }) {
       {featured && (
         <>
           <SectionHead title="Torneo destacado" onMore={() => goTo('torneos')} />
-          <div className="card" style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 24 }}>
-            <div style={{ height: 110, position: 'relative', background: '#22251E' }}>
+          <div className="card" style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 24, cursor: 'pointer' }}
+            onClick={() => openDetail('torneo', featured.id)}>
+            <div style={{ height: 150, position: 'relative', background: '#000' }}>
               {featured.poster_url
-                ? <img src={featured.poster_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ? <img src={featured.poster_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 : <img src="/uploads/IMG_5193.jpeg" alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }} />}
               <DateBadge iso={featured.starts_at} />
+              <div style={{ position: 'absolute', bottom: 8, right: 8 }}>
+                <Countdown target={featured.starts_at} variant="evento" compact />
+              </div>
             </div>
             <div style={{ padding: 14 }}>
               <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6 }}>{featured.title}</div>
               <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                {featured.capacity ? `Cupo: ${featured.capacity} parejas` : 'Inscripciones abiertas'}
+                {featured.capacity ? `Cupo: ${featured.capacity} parejas` : 'Inscripciones abiertas'} · toca para ver
               </div>
             </div>
           </div>
@@ -63,14 +68,18 @@ export default function Inicio({ goTo }) {
       <SectionHead title="Avisos" onMore={() => goTo('torneos')} />
       {avisos.length === 0 && <div style={{ color: 'var(--faint)', fontSize: 13, textAlign: 'center', padding: '18px 0' }}>Sin avisos por ahora — ¡nos vemos en la cancha! 🎾</div>}
       {avisos.map(av => (
-        <div key={av.id} className="card" style={{ padding: 14, marginBottom: 12, display: 'flex', gap: 12 }}>
+        <div key={av.id} className="card" style={{ padding: 14, marginBottom: 12, display: 'flex', gap: 12, cursor: 'pointer' }}
+          onClick={() => openDetail('aviso', av.id)}>
           {av.image_url
             ? <img src={av.image_url} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
             : <div style={{ width: 44, height: 44, borderRadius: 10, background: 'var(--surf2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>📣</div>}
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{av.title}</div>
-            {av.body && <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.4, marginBottom: 6 }}>{av.body}</div>}
-            <div style={{ fontSize: 10, color: 'var(--faint)' }}>{timeAgo(av.created_at)}</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{av.is_pinned ? '📌 ' : ''}{av.title}</div>
+            {av.body && <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.4, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{av.body}</div>}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ fontSize: 10, color: 'var(--faint)' }}>{timeAgo(av.created_at)}</div>
+              {av.expires_at && new Date(av.expires_at) > new Date() && <Countdown target={av.expires_at} variant="promo" compact />}
+            </div>
           </div>
         </div>
       ))}

@@ -120,6 +120,7 @@ create table public.announcements (
   image_url    text,
   is_pinned    boolean not null default false,
   is_published boolean not null default true,
+  expires_at   timestamptz,                          -- fin de promo (cuenta regresiva)
   created_by   uuid references public.profiles(id),
   created_at   timestamptz not null default now()
 );

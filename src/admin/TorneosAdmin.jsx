@@ -27,7 +27,7 @@ export default function TorneosAdmin() {
   }
   function newAviso() {
     setError('')
-    setDrawer({ type: 'aviso', data: { title: '', body: '', is_pinned: false, is_published: true } })
+    setDrawer({ type: 'aviso', data: { title: '', body: '', is_pinned: false, is_published: true, expires_at: '' } })
   }
   function edit(type, row) {
     setError('')
@@ -36,6 +36,7 @@ export default function TorneosAdmin() {
         ...row,
         categories: type === 'torneo' ? (row.categories ?? []).join(', ') : undefined,
         starts_at: type === 'torneo' ? toLocalInput(row.starts_at) : undefined,
+        expires_at: type === 'aviso' && row.expires_at ? toLocalInput(row.expires_at) : '',
       }
     })
   }
@@ -87,7 +88,11 @@ export default function TorneosAdmin() {
         const { error } = await q
         if (error) throw error
       } else {
-        const row = { title: d.title.trim(), body: d.body?.trim() || null, is_pinned: d.is_pinned, is_published: d.is_published, image_url }
+        const row = {
+          title: d.title.trim(), body: d.body?.trim() || null,
+          is_pinned: d.is_pinned, is_published: d.is_published, image_url,
+          expires_at: d.expires_at ? new Date(d.expires_at).toISOString() : null,
+        }
         const q = d.id
           ? supabase.from('announcements').update(row).eq('id', d.id)
           : supabase.from('announcements').insert(row)
@@ -227,6 +232,9 @@ export default function TorneosAdmin() {
                 <div className="field-label">Texto del aviso</div>
                 <textarea className="input" rows={3} style={{ marginBottom: 12, resize: 'vertical' }} value={d.body ?? ''}
                   onChange={e => upd(setDrawer, { body: e.target.value })} />
+                <div className="field-label">Fin de la promo (opcional · muestra cuenta regresiva)</div>
+                <input className="input" type="datetime-local" style={{ marginBottom: 12 }} value={d.expires_at ?? ''}
+                  onChange={e => upd(setDrawer, { expires_at: e.target.value })} />
                 <Check label="Fijar arriba (destacado)" checked={d.is_pinned} onChange={v => upd(setDrawer, { is_pinned: v })} />
               </>
             )}

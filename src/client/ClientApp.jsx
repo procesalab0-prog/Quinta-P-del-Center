@@ -20,6 +20,10 @@ const TABS = [
 export default function ClientApp() {
   const { session } = useAuth()
   const [screen, setScreen] = useState('inicio')
+  const [openEvent, setOpenEvent] = useState(null) // {kind, id} para abrir detalle desde Inicio
+
+  // Desde Inicio: ir a Torneos y abrir directo el torneo/aviso tocado
+  const openDetail = (kind, id) => { setOpenEvent({ kind, id }); setScreen('torneos') }
 
   if (session === undefined) {
     return <div className="phone" style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -33,10 +37,10 @@ export default function ClientApp() {
     <div className="phone">
       <div className="phone-scroll">
         <ErrorBoundary resetKey={screen}>
-          {screen === 'inicio' && <Inicio goTo={setScreen} />}
+          {screen === 'inicio' && <Inicio goTo={setScreen} openDetail={openDetail} />}
           {screen === 'tarjeta' && <Tarjeta />}
           {screen === 'reservas' && <Reservas />}
-          {screen === 'torneos' && <Torneos />}
+          {screen === 'torneos' && <Torneos openEvent={openEvent} onConsumeOpen={() => setOpenEvent(null)} />}
           {screen === 'perfil' && <Perfil />}
         </ErrorBoundary>
       </div>

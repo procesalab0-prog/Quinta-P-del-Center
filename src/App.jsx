@@ -16,8 +16,8 @@ function useHomeScreenIdentity() {
     const href = isAdmin ? '/icon-admin.png' : '/icon-socios.png'
     if (icon) icon.href = href
     if (favicon) favicon.href = href
-    if (title) title.setAttribute('content', isAdmin ? 'Quinta Admin' : 'Quinta Padel')
-    document.title = isAdmin ? 'Quinta Padel · Admin' : 'Quinta Padel Center'
+    if (title) title.setAttribute('content', isAdmin ? 'Administracion' : 'Quinta Padel')
+    document.title = isAdmin ? 'Administracion' : 'Quinta Padel Center'
   }, [pathname])
 }
 
