@@ -8,6 +8,6 @@
   "theme_color": "#0A0B09",
   "lang": "es",
   "icons": [
-    { "src": "/assets/logo-mark-square.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icon-socios.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
   ]
 }
