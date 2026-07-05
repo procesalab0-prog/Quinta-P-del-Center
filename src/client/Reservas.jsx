@@ -23,11 +23,36 @@ export default function Reservas() {
   const day = days[dayIdx]
   const dayStr = ymd(day)
 
+  const [upcoming, setUpcoming] = useState([])
+
   useEffect(() => {
     supabase.from('courts').select('*').eq('is_active', true).order('id').then(({ data }) => {
       setCourts(data ?? [])
       if (data?.length) setCourtId(prev => prev ?? data[0].id)
     })
+  }, [])
+
+  // Todas mis reservas próximas (las haga yo o las agende el club en el admin)
+  async function loadUpcoming() {
+    const { data } = await supabase.from('reservations')
+      .select('*, courts(name)')
+      .eq('member_id', session.user.id)
+      .gte('ends_at', new Date().toISOString())
+      .neq('status', 'cancelled')
+      .order('starts_at')
+      .limit(20)
+    setUpcoming(data ?? [])
+  }
+  useEffect(() => { loadUpcoming() }, [])
+
+  // Se actualiza en vivo si el club agenda, confirma o cancela una reserva mía
+  useEffect(() => {
+    const ch = supabase.channel('mis-reservas')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'reservations', filter: `member_id=eq.${session.user.id}` },
+        () => loadUpcoming())
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
   }, [])
 
   async function loadDay() {
@@ -69,6 +94,7 @@ export default function Reservas() {
     }
     setConfirmed(true)
     loadDay()
+    loadUpcoming()
   }
 
   const court = courts.find(c => c.id === courtId)
@@ -76,6 +102,36 @@ export default function Reservas() {
   return (
     <div style={{ animation: 'qpc-fadein 0.25s ease', paddingBottom: 110 }}>
       <div className="h-page" style={{ marginBottom: 14 }}>Reservar cancha</div>
+
+      {upcoming.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <div className="h-section" style={{ fontSize: 15, marginBottom: 10 }}>Mis próximas reservas</div>
+          {upcoming.map(r => {
+            const d = new Date(r.starts_at)
+            const end = new Date(r.ends_at)
+            const hhmm = (x) => `${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`
+            const estado = r.status === 'confirmed'
+              ? { txt: 'Confirmada', color: 'var(--lime)' }
+              : r.status === 'blocked'
+                ? { txt: 'Bloqueo', color: 'var(--muted)' }
+                : { txt: 'Por confirmar', color: '#F4D35E' }
+            return (
+              <div key={r.id} className="card" style={{ padding: 14, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{r.courts?.name ?? 'Cancha'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
+                    {DAY_SHORT[d.getDay()]} {d.getDate()} · {hhmm(d)}–{hhmm(end)}
+                    {r.is_paid ? ' · pagada' : ''}
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: estado.color, border: `1px solid ${estado.color}`, borderRadius: 999, padding: '5px 10px', whiteSpace: 'nowrap' }}>
+                  {estado.txt}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 16, paddingBottom: 4 }}>
         {days.map((d, i) => (

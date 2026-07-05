@@ -43,7 +43,13 @@ export default function TorneosAdmin() {
   async function uploadImage(file) {
     const path = `${Date.now()}-${file.name.replaceAll(/[^a-zA-Z0-9.\-_]/g, '')}`
     const { error } = await supabase.storage.from('public-assets').upload(path, file)
-    if (error) throw error
+    if (error) {
+      if ((error.message || '').toLowerCase().includes('bucket not found')) {
+        throw new Error('Falta crear el bucket "public-assets" en Supabase (Storage → New bucket, público). ' +
+          'Mientras tanto, se guardó sin imagen.')
+      }
+      throw error
+    }
     return supabase.storage.from('public-assets').getPublicUrl(path).data.publicUrl
   }
 
@@ -51,9 +57,18 @@ export default function TorneosAdmin() {
     e.preventDefault()
     setBusy(true); setError('')
     const d = drawer.data
+    let bucketWarning = ''
     try {
       let image_url = d.poster_url ?? d.image_url ?? null
-      if (d._file) image_url = await uploadImage(d._file)
+      if (d._file) {
+        try {
+          image_url = await uploadImage(d._file)
+        } catch (upErr) {
+          // Si falta el bucket, no bloqueamos: guardamos sin imagen y avisamos.
+          if ((upErr.message || '').includes('public-assets')) bucketWarning = upErr.message
+          else throw upErr
+        }
+      }
 
       if (drawer.type === 'torneo') {
         const row = {
@@ -79,7 +94,9 @@ export default function TorneosAdmin() {
         const { error } = await q
         if (error) throw error
       }
-      setDrawer(null); load()
+      load()
+      if (bucketWarning) { setError('⚠️ ' + bucketWarning); setDrawer(dr => ({ ...dr, data: { ...dr.data, _file: null } })) }
+      else setDrawer(null)
     } catch (err) {
       setError('No se pudo guardar: ' + err.message)
     } finally {

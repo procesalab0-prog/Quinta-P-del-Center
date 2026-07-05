@@ -52,7 +52,7 @@ export default function ReservasAdmin() {
 
   function openNew(courtId, hour) {
     setError('')
-    setDrawer({ mode: 'new', data: { court_id: courtId ?? courts[0]?.id, hour: hour ?? HOURS[0], member_id: null, customer_name: '', is_paid: false, status: 'confirmed' } })
+    setDrawer({ mode: 'new', data: { court_id: courtId ?? courts[0]?.id, hour: hour ?? HOURS[0], member_id: null, customer_name: '', is_paid: false, status: 'confirmed', notes: '' } })
   }
   function openEdit(r) {
     setError('')
@@ -69,6 +69,7 @@ export default function ReservasAdmin() {
       customer_name: d.member_id ? null : (d.customer_name?.trim() || 'Reserva'),
       starts_at: start.toISOString(), ends_at: end.toISOString(),
       status: d.status, is_paid: d.is_paid,
+      notes: d.notes?.trim() || null,
     }
     if (drawer.mode === 'new') {
       const { error } = await supabase.from('reservations').insert(row)
@@ -162,6 +163,12 @@ export default function ReservasAdmin() {
               <Toggle active={!d.is_paid} label="Pendiente" onClick={() => setDrawer(dr => ({ ...dr, data: { ...dr.data, is_paid: false } }))} />
             </div>
 
+            <div className="field-label">Notas internas (solo visibles aquí en admin)</div>
+            <textarea className="input" rows={3} style={{ marginBottom: 20, resize: 'vertical' }}
+              placeholder="Ej. pagó con transferencia, trae invitado, revancha del sábado…"
+              value={d.notes ?? ''}
+              onChange={e => setDrawer(dr => ({ ...dr, data: { ...dr.data, notes: e.target.value } }))} />
+
             {error && <div className="error-note" style={{ marginBottom: 12 }}>{error}</div>}
 
             <div style={{ display: 'flex', gap: 10 }}>
@@ -188,7 +195,9 @@ function FragmentRow({ hour, courts, cellReservation, openNew, openEdit }) {
         const cls = r.status === 'blocked' ? 'blocked' : r.is_paid ? 'paid' : 'pending'
         const name = r.customer_name || r.profiles?.full_name || 'Reserva'
         return (
-          <div key={c.id} className={`cal-cell ${cls}`} onClick={() => openEdit(r)} title={name}>
+          <div key={c.id} className={`cal-cell ${cls}`} onClick={() => openEdit(r)}
+            title={name + (r.notes ? `\n📝 ${r.notes}` : '')} style={{ position: 'relative' }}>
+            {r.notes && <span style={{ position: 'absolute', top: 2, right: 4, fontSize: 9 }}>📝</span>}
             {r.status === 'blocked' ? 'Bloqueado' : name.split(' ')[0]}
             <div style={{ fontSize: 9, opacity: 0.75 }}>{r.status === 'blocked' ? '' : r.is_paid ? 'Pagado' : r.status === 'pending' ? 'Por confirmar' : 'Pendiente pago'}</div>
           </div>
