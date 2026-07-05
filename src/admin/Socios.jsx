@@ -7,6 +7,10 @@ export default function Socios() {
   const [search, setSearch] = useState('')
   const [sel, setSel] = useState(null)
   const [historial, setHistorial] = useState([])
+  const [copied, setCopied] = useState(false)
+  const [visitBusy, setVisitBusy] = useState(false)
+  const [visitMsg, setVisitMsg] = useState('')
+  const [visitErr, setVisitErr] = useState('')
 
   async function load() {
     const { data } = await supabase.from('profiles').select('*').order('full_name')
@@ -16,8 +20,30 @@ export default function Socios() {
 
   async function openFicha(so) {
     setSel(so)
+    setVisitMsg(''); setVisitErr(''); setCopied(false)
     const { data } = await supabase.from('visits').select('created_at')
       .eq('member_id', so.id).order('created_at', { ascending: false }).limit(5)
+    setHistorial(data ?? [])
+  }
+
+  async function copiarCodigo() {
+    try { await navigator.clipboard.writeText(sel.member_code); setCopied(true); setTimeout(() => setCopied(false), 1800) }
+    catch { window.prompt('Copia el código del socio:', sel.member_code) }
+  }
+
+  async function registrarVisita() {
+    setVisitBusy(true); setVisitMsg(''); setVisitErr('')
+    const { data, error } = await supabase.rpc('register_visit', { p_code: sel.member_code })
+    setVisitBusy(false)
+    if (error) { setVisitErr(error.message.replace(/^.*?:\s*/, '') || 'No se pudo registrar'); return }
+    setVisitMsg(`✓ Visita registrada · ${data.stamps} sellos`)
+    setSel(s => ({ ...s, stamps: data.stamps, total_visits: data.total_visits, level: data.level }))
+    setSocios(list => list.map(x => x.id === sel.id ? { ...x, stamps: data.stamps, total_visits: data.total_visits, level: data.level } : x))
+    openFichaHistorial()
+  }
+  async function openFichaHistorial() {
+    const { data } = await supabase.from('visits').select('created_at')
+      .eq('member_id', sel.id).order('created_at', { ascending: false }).limit(5)
     setHistorial(data ?? [])
   }
 
@@ -93,7 +119,24 @@ export default function Socios() {
               {LEVEL_LABEL[sel.level]} · {sel.stamps} sellos · {sel.total_visits} visitas
             </div>
             {sel.phone && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>📞 {sel.phone}</div>}
-            <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 18 }}>{memberNumber(sel.member_code)}</div>
+            <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 14 }}>{memberNumber(sel.member_code)}</div>
+
+            {/* Registrar visita sin necesidad del QR (socio sin celular) */}
+            {visitMsg && <div className="ok-note" style={{ marginBottom: 10 }}>{visitMsg}</div>}
+            {visitErr && <div className="error-note" style={{ marginBottom: 10 }}>{visitErr}</div>}
+            <button className="btn-lime" style={{ marginBottom: 16, borderRadius: 9 }} onClick={registrarVisita} disabled={visitBusy}>
+              {visitBusy ? '…' : '✓ Registrar visita'}
+            </button>
+
+            <div className="field-label">Código del socio (para el escáner)</div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              <div style={{ flex: 1, minWidth: 0, background: 'var(--surf2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {sel.member_code}
+              </div>
+              <button className="btn-outline" style={{ width: 'auto', padding: '10px 14px', fontSize: 12 }} onClick={copiarCodigo}>
+                {copied ? '✓' : 'Copiar'}
+              </button>
+            </div>
 
             <div className="field-label">Ajuste manual de sellos</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>

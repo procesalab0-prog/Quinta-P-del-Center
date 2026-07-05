@@ -11,9 +11,13 @@ export default function EventoModal({ item, kind, registration, onClose, onRegis
 
   return (
     <div onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 70 }}>
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 70,
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
+        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+      }}>
       <div onClick={e => e.stopPropagation()}
-        style={{ width: '100%', maxWidth: 430, maxHeight: '92dvh', overflowY: 'auto', background: 'var(--bg0)', borderRadius: '20px 20px 0 0', borderTop: '1px solid rgba(215,242,60,0.3)' }}>
+        style={{ width: '100%', maxWidth: 430, margin: '8dvh auto 0', background: 'var(--bg0)', borderRadius: '20px 20px 0 0', borderTop: '1px solid rgba(215,242,60,0.3)' }}>
 
         {/* Barra superior */}
         <div style={{ position: 'sticky', top: 0, background: 'var(--bg0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--line-soft)', zIndex: 2 }}>
