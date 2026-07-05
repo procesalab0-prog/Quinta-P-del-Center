@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth.jsx'
-import { HOURS, DAY_SHORT, ymd, slotDates, dayRangeISO } from '../lib/util'
+import { HOURS, DAY_SHORT, ymd, slotDates, dayRangeISO, slotEnd } from '../lib/util'
 
 export default function Reservas() {
   const { session } = useAuth()
@@ -119,7 +119,7 @@ export default function Reservas() {
           ) : (
             <>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
-                {court?.name} · {DAY_SHORT[day.getDay()]} {day.getDate()} · {slot} (1 hora)
+                {court?.name} · {DAY_SHORT[day.getDay()]} {day.getDate()} · {slot}–{slotEnd(slot)} (1½ h)
               </div>
               {error && <div className="error-note" style={{ marginBottom: 8 }}>{error}</div>}
               <button className="btn-lime" style={{ padding: 11, borderRadius: 9 }} onClick={confirmar}>Confirmar reserva</button>

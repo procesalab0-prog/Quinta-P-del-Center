@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { HOURS, ymd, slotDates, dayRangeISO } from '../lib/util'
+import { HOURS, ymd, slotDates, dayRangeISO, slotEnd } from '../lib/util'
 
 export default function ReservasAdmin() {
   const [courts, setCourts] = useState([])
@@ -138,10 +138,10 @@ export default function ReservasAdmin() {
               {courts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
 
-            <div className="field-label">Horario ({day})</div>
+            <div className="field-label">Horario ({day}) · 1½ h</div>
             <select className="input" style={{ marginBottom: 14 }} value={d.hour}
               onChange={e => setDrawer(dr => ({ ...dr, data: { ...dr.data, hour: e.target.value } }))}>
-              {HOURS.map(h => <option key={h} value={h}>{h} — {endHour(h)}</option>)}
+              {HOURS.map(h => <option key={h} value={h}>{h} — {slotEnd(h)}</option>)}
             </select>
 
             <div className="field-label">Estado</div>
@@ -205,13 +205,9 @@ function Toggle({ active, label, onClick }) {
   )
 }
 
-function endHour(h) {
-  const n = Number(h.slice(0, 2)) + 1
-  return `${String(n).padStart(2, '0')}:00`
-}
 function hourOf(iso) {
   const d = new Date(iso)
-  return `${String(d.getHours()).padStart(2, '0')}:00`
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 function msgError(error) {
   if (error.message.includes('no_overlap')) return 'Ya hay una reserva en esa cancha y horario.'
