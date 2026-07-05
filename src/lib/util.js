@@ -1,8 +1,7 @@
 export const LEVEL_LABEL = { bronce: 'Bronce', plata: 'Plata', oro: 'Oro' }
 export const LEVEL_BG = { bronce: '#B08A63', plata: '#C9CDC4', oro: '#D7F23C' }
 
-// Horario del club: 08:00 a 23:00, bloques de 1 hora y media.
-// Genera: 08:00, 09:30, 11:00 … 21:30 (el último termina justo a las 23:00).
+// Valores por defecto del horario del club (se pueden cambiar en Configuración).
 export const OPEN_HOUR = 8
 export const CLOSE_HOUR = 23
 export const SLOT_MINUTES = 90
@@ -13,18 +12,33 @@ function fmtMin(total) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-export const HOURS = (() => {
+// Genera los horarios de reserva a partir de la configuración del club.
+// Ej. (8, 23, 90) → 08:00, 09:30, 11:00 … 21:30 (el último termina a las 23:00).
+export function buildSlots(openHour = OPEN_HOUR, closeHour = CLOSE_HOUR, slotMinutes = SLOT_MINUTES) {
+  const step = Math.max(15, Number(slotMinutes) || SLOT_MINUTES)
   const slots = []
-  for (let m = OPEN_HOUR * 60; m + SLOT_MINUTES <= CLOSE_HOUR * 60; m += SLOT_MINUTES) {
+  for (let m = openHour * 60; m + step <= closeHour * 60; m += step) {
     slots.push(fmtMin(m))
   }
   return slots
-})()
+}
+
+// Horarios con los valores por defecto (fallback cuando aún no cargó la config).
+export const HOURS = buildSlots()
+
+// Lee la config de reservas del objeto settings, con valores por defecto seguros.
+export function slotConfig(settings) {
+  return {
+    openHour: settings?.open_hour ?? OPEN_HOUR,
+    closeHour: settings?.close_hour ?? CLOSE_HOUR,
+    slotMinutes: settings?.reservation_slot_minutes ?? SLOT_MINUTES,
+  }
+}
 
 // Hora de fin de un slot dado su inicio 'HH:MM' → 'HH:MM'
-export function slotEnd(hour) {
+export function slotEnd(hour, slotMinutes = SLOT_MINUTES) {
   const [h, m] = hour.split(':').map(Number)
-  return fmtMin(h * 60 + m + SLOT_MINUTES)
+  return fmtMin(h * 60 + m + (Number(slotMinutes) || SLOT_MINUTES))
 }
 
 export const DAY_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -51,9 +65,9 @@ export function dayRangeISO(day /* 'YYYY-MM-DD' */) {
   return [start.toISOString(), end.toISOString()]
 }
 
-export function slotDates(day /* 'YYYY-MM-DD' */, hour /* 'HH:MM' */) {
+export function slotDates(day /* 'YYYY-MM-DD' */, hour /* 'HH:MM' */, slotMinutes = SLOT_MINUTES) {
   const start = new Date(`${day}T${hour}:00`)
-  const end = new Date(start.getTime() + SLOT_MINUTES * 60 * 1000)
+  const end = new Date(start.getTime() + (Number(slotMinutes) || SLOT_MINUTES) * 60 * 1000)
   return { start, end }
 }
 

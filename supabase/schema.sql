@@ -79,7 +79,10 @@ create table public.loyalty_settings (
   stamps_per_reward        int not null default 10,
   duplicate_window_minutes int not null default 120,    -- anti doble sello
   silver_visits            int not null default 20,
-  gold_visits              int not null default 50
+  gold_visits              int not null default 50,
+  open_hour                int not null default 8,       -- horario de reservas
+  close_hour               int not null default 23,
+  reservation_slot_minutes int not null default 90       -- duración de cada reserva
 );
 insert into public.loyalty_settings (id) values (1);
 

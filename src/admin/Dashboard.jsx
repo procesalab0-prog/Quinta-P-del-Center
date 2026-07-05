@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { HOURS, DAY_SHORT, ymd, dayRangeISO } from '../lib/util'
+import { DAY_SHORT, ymd, dayRangeISO, buildSlots, slotConfig } from '../lib/util'
+import { useAuth } from '../lib/auth.jsx'
 
 export default function Dashboard() {
+  const { settings } = useAuth()
   const [kpis, setKpis] = useState(null)
   const [weekBars, setWeekBars] = useState([])
   const [heatmap, setHeatmap] = useState([])
 
   useEffect(() => {
+    const { openHour, closeHour, slotMinutes } = slotConfig(settings)
+    const slotsPerCourt = buildSlots(openHour, closeHour, slotMinutes).length || 1
     async function load() {
       const [hoyDesde, hoyHasta] = dayRangeISO(ymd(new Date()))
       const hace7 = new Date(); hace7.setDate(hace7.getDate() - 6); hace7.setHours(0, 0, 0, 0)
@@ -25,7 +29,7 @@ export default function Dashboard() {
         supabase.from('reservations').select('starts_at').gte('starts_at', hace28.toISOString()).neq('status', 'cancelled'),
       ])
 
-      const totalSlots = (courts.count || 1) * HOURS.length
+      const totalSlots = (courts.count || 1) * slotsPerCourt
       setKpis([
         { label: 'Visitas hoy', value: visHoy.count ?? 0 },
         { label: 'Socios activos', value: socios.count ?? 0 },
@@ -55,7 +59,7 @@ export default function Dashboard() {
       setHeatmap({ grid, maxCell, labels: buckets.map(b => `${b}h`) })
     }
     load()
-  }, [])
+  }, [settings])
 
   return (
     <div>

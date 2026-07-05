@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth.jsx'
-import { HOURS, DAY_SHORT, ymd, slotDates, dayRangeISO, slotEnd } from '../lib/util'
+import { DAY_SHORT, ymd, slotDates, dayRangeISO, slotEnd, buildSlots, slotConfig } from '../lib/util'
 
 export default function Reservas() {
-  const { session } = useAuth()
+  const { session, settings } = useAuth()
+  const { openHour, closeHour, slotMinutes } = slotConfig(settings)
+  const HOURS = useMemo(() => buildSlots(openHour, closeHour, slotMinutes), [openHour, closeHour, slotMinutes])
   const [courts, setCourts] = useState([])
   const [dayIdx, setDayIdx] = useState(0)
   const [courtId, setCourtId] = useState(null)
@@ -42,7 +44,7 @@ export default function Reservas() {
   useEffect(() => { loadDay(); setSlot(null); setConfirmed(false); setError('') }, [dayStr])
 
   function slotState(hour) {
-    const { start, end } = slotDates(dayStr, hour)
+    const { start, end } = slotDates(dayStr, hour, slotMinutes)
     const isMine = mine.some(r => r.court_id === courtId && new Date(r.starts_at) < end && new Date(r.ends_at) > start)
     if (isMine) return 'mine'
     const occ = occupied.some(o => o.court_id === courtId && new Date(o.starts_at) < end && new Date(o.ends_at) > start)
@@ -53,7 +55,7 @@ export default function Reservas() {
 
   async function confirmar() {
     setError('')
-    const { start, end } = slotDates(dayStr, slot)
+    const { start, end } = slotDates(dayStr, slot, slotMinutes)
     const { error } = await supabase.from('reservations').insert({
       court_id: courtId, member_id: session.user.id,
       starts_at: start.toISOString(), ends_at: end.toISOString(), status: 'pending',
@@ -119,7 +121,7 @@ export default function Reservas() {
           ) : (
             <>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
-                {court?.name} · {DAY_SHORT[day.getDay()]} {day.getDate()} · {slot}–{slotEnd(slot)} (1½ h)
+                {court?.name} · {DAY_SHORT[day.getDay()]} {day.getDate()} · {slot}–{slotEnd(slot, slotMinutes)}
               </div>
               {error && <div className="error-note" style={{ marginBottom: 8 }}>{error}</div>}
               <button className="btn-lime" style={{ padding: 11, borderRadius: 9 }} onClick={confirmar}>Confirmar reserva</button>

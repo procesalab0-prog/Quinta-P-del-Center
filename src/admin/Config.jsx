@@ -17,15 +17,27 @@ export default function Config({ isAdmin }) {
   }
   useEffect(() => { load() }, [])
 
+  const [saveError, setSaveError] = useState('')
+
   async function saveSettings(e) {
     e.preventDefault()
+    setSaveError('')
+    const open = Number(settings.open_hour)
+    const close = Number(settings.close_hour)
+    const slot = Number(settings.reservation_slot_minutes)
+    if (close <= open) { setSaveError('La hora de cierre debe ser mayor que la de apertura.'); return }
+    if (slot < 15 || slot > 240) { setSaveError('La duración debe estar entre 15 y 240 minutos.'); return }
     const { error } = await supabase.from('loyalty_settings').update({
       stamps_per_reward: Number(settings.stamps_per_reward),
       duplicate_window_minutes: Number(settings.duplicate_window_minutes),
       silver_visits: Number(settings.silver_visits),
       gold_visits: Number(settings.gold_visits),
+      open_hour: open,
+      close_hour: close,
+      reservation_slot_minutes: slot,
     }).eq('id', 1)
-    if (!error) { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+    if (error) { setSaveError('No se pudo guardar: ' + error.message); return }
+    setSaved(true); setTimeout(() => setSaved(false), 2000)
   }
 
   async function addReward(e) {
@@ -51,7 +63,21 @@ export default function Config({ isAdmin }) {
 
       <form onSubmit={saveSettings} className="card" style={{ maxWidth: 460, overflow: 'hidden', marginBottom: 22 }}>
         <Row label="Nombre del club"><div style={{ fontSize: 14 }}>Quinta Padel Center</div></Row>
-        <Row label="Horario de atención"><div style={{ fontSize: 14 }}>Lunes a domingo · 08:00 – 23:00</div></Row>
+        <Row label="Hora de apertura (0–23)">
+          <input className="input" type="number" min="0" max="23" style={{ width: 90 }} disabled={!isAdmin}
+            value={settings.open_hour ?? 8}
+            onChange={e => setSettings({ ...settings, open_hour: e.target.value })} />
+        </Row>
+        <Row label="Hora de cierre (1–24)">
+          <input className="input" type="number" min="1" max="24" style={{ width: 90 }} disabled={!isAdmin}
+            value={settings.close_hour ?? 23}
+            onChange={e => setSettings({ ...settings, close_hour: e.target.value })} />
+        </Row>
+        <Row label="Duración de cada reserva (minutos)">
+          <input className="input" type="number" min="15" max="240" step="15" style={{ width: 90 }} disabled={!isAdmin}
+            value={settings.reservation_slot_minutes ?? 90}
+            onChange={e => setSettings({ ...settings, reservation_slot_minutes: e.target.value })} />
+        </Row>
         <Row label="Sellos para completar la tarjeta">
           <input className="input" type="number" min="1" style={{ width: 90 }} disabled={!isAdmin}
             value={settings.stamps_per_reward}
@@ -75,6 +101,7 @@ export default function Config({ isAdmin }) {
         {isAdmin && (
           <div style={{ padding: 16 }}>
             {saved && <div className="ok-note" style={{ marginBottom: 10 }}>✓ Configuración guardada</div>}
+            {saveError && <div className="error-note" style={{ marginBottom: 10 }}>{saveError}</div>}
             <button className="btn-lime" style={{ borderRadius: 9 }}>Guardar cambios</button>
           </div>
         )}

@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { HOURS, ymd, slotDates, dayRangeISO, slotEnd } from '../lib/util'
+import { useAuth } from '../lib/auth.jsx'
+import { ymd, slotDates, dayRangeISO, slotEnd, buildSlots, slotConfig } from '../lib/util'
 
 export default function ReservasAdmin() {
+  const { settings } = useAuth()
+  const { openHour, closeHour, slotMinutes } = slotConfig(settings)
+  const HOURS = useMemo(() => buildSlots(openHour, closeHour, slotMinutes), [openHour, closeHour, slotMinutes])
   const [courts, setCourts] = useState([])
   const [day, setDay] = useState(ymd(new Date()))
   const [reservas, setReservas] = useState([])
@@ -42,7 +46,7 @@ export default function ReservasAdmin() {
   }, [day])
 
   function cellReservation(courtId, hour) {
-    const { start, end } = slotDates(day, hour)
+    const { start, end } = slotDates(day, hour, slotMinutes)
     return reservas.find(r => r.court_id === courtId && new Date(r.starts_at) < end && new Date(r.ends_at) > start)
   }
 
@@ -58,7 +62,7 @@ export default function ReservasAdmin() {
   async function save() {
     setError('')
     const d = drawer.data
-    const { start, end } = slotDates(day, d.hour)
+    const { start, end } = slotDates(day, d.hour, slotMinutes)
     const row = {
       court_id: d.court_id,
       member_id: d.member_id || null,
@@ -138,10 +142,10 @@ export default function ReservasAdmin() {
               {courts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
 
-            <div className="field-label">Horario ({day}) · 1½ h</div>
+            <div className="field-label">Horario ({day}) · {slotMinutes} min</div>
             <select className="input" style={{ marginBottom: 14 }} value={d.hour}
               onChange={e => setDrawer(dr => ({ ...dr, data: { ...dr.data, hour: e.target.value } }))}>
-              {HOURS.map(h => <option key={h} value={h}>{h} — {slotEnd(h)}</option>)}
+              {HOURS.map(h => <option key={h} value={h}>{h} — {slotEnd(h, slotMinutes)}</option>)}
             </select>
 
             <div className="field-label">Estado</div>
