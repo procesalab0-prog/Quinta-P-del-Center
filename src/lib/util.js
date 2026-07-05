@@ -25,6 +25,14 @@ export function ymd(date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Rango completo de un día LOCAL expresado en ISO/UTC, para filtrar timestamptz
+// sin perder las reservas de la tarde-noche (México va horas atrás de UTC).
+export function dayRangeISO(day /* 'YYYY-MM-DD' */) {
+  const start = new Date(`${day}T00:00:00`)
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
+  return [start.toISOString(), end.toISOString()]
+}
+
 export function slotDates(day /* 'YYYY-MM-DD' */, hour /* 'HH:00' */) {
   const start = new Date(`${day}T${hour}:00`)
   const end = new Date(start.getTime() + 60 * 60 * 1000)

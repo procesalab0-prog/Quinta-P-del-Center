@@ -8,6 +8,7 @@ import TorneosAdmin from './TorneosAdmin.jsx'
 import Dashboard from './Dashboard.jsx'
 import Config from './Config.jsx'
 import { IconScan, IconCalendarSm, IconUsers, IconTrophy, IconChart, IconGear } from '../components/Icons.jsx'
+import ErrorBoundary from '../components/ErrorBoundary.jsx'
 
 const NAV = [
   { id: 'scanner', label: 'Escáner', Icon: IconScan },
@@ -66,12 +67,14 @@ export default function AdminApp() {
       </aside>
 
       <main className="admin-main">
-        {screen === 'scanner' && <Escaner />}
-        {screen === 'reservas' && <ReservasAdmin />}
-        {screen === 'socios' && <Socios />}
-        {screen === 'torneos' && <TorneosAdmin />}
-        {screen === 'dashboard' && <Dashboard />}
-        {screen === 'config' && <Config isAdmin={profile.role === 'admin'} />}
+        <ErrorBoundary resetKey={screen}>
+          {screen === 'scanner' && <Escaner />}
+          {screen === 'reservas' && <ReservasAdmin />}
+          {screen === 'socios' && <Socios />}
+          {screen === 'torneos' && <TorneosAdmin />}
+          {screen === 'dashboard' && <Dashboard />}
+          {screen === 'config' && <Config isAdmin={profile.role === 'admin'} />}
+        </ErrorBoundary>
       </main>
     </div>
   )

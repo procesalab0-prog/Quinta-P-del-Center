@@ -13,6 +13,7 @@ export default function Escaner() {
   const [rewards, setRewards] = useState([])
   const [manual, setManual] = useState('')
   const [cameraError, setCameraError] = useState('')
+  const [retry, setRetry] = useState(0)
   const [perReward, setPerReward] = useState(10)
   const scannerRef = useRef(null)
   const busyRef = useRef(false)
@@ -24,10 +25,13 @@ export default function Escaner() {
     })
   }, [])
 
-  // Cámara: se enciende cuando no hay socio en pantalla
+  // Cámara: se enciende cuando no hay socio en pantalla.
+  // Ojo: si la cámara nunca arrancó (permiso negado), stop() lanza un error
+  // síncrono que tiraba toda la app al cambiar de pantalla — por eso el flag.
   useEffect(() => {
     if (member) return
     let cancelled = false
+    let running = false
     const scanner = new Html5Qrcode(READER_ID)
     scannerRef.current = scanner
     scanner.start(
@@ -35,12 +39,20 @@ export default function Escaner() {
       { fps: 8, qrbox: { width: 230, height: 230 } },
       (text) => { if (!cancelled) lookup(text) },
       () => {}
-    ).catch(() => setCameraError('No se pudo abrir la cámara. Revisa permisos o usa el código manual.'))
+    ).then(() => {
+      running = true
+      if (cancelled) { try { scanner.stop().catch(() => {}) } catch { /* ya detenido */ } }
+    }).catch(() => {
+      if (!cancelled) setCameraError('No se pudo abrir la cámara. Revisa los permisos del navegador o usa el código manual.')
+    })
     return () => {
       cancelled = true
-      scanner.stop().then(() => scanner.clear()).catch(() => {})
+      try {
+        if (running) scanner.stop().then(() => scanner.clear()).catch(() => {})
+        else scanner.clear()
+      } catch { /* nunca arrancó: no hay nada que detener */ }
     }
-  }, [member])
+  }, [member, retry])
 
   async function lookup(scanned) {
     if (busyRef.current) return
@@ -91,8 +103,10 @@ export default function Escaner() {
           <div id={READER_ID} style={{ width: '100%', minHeight: 360 }} />
           {member && <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,11,9,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>Socio identificado ✓</div>}
           {!member && cameraError && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '0 50px' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '0 50px' }}>
               {cameraError}
+              <button className="btn-outline" style={{ width: 'auto', padding: '9px 16px', fontSize: 11 }}
+                onClick={() => { setCameraError(''); setRetry(r => r + 1) }}>Reintentar cámara</button>
             </div>
           )}
           <div style={{ position: 'absolute', bottom: 10, left: 0, right: 0, textAlign: 'center', color: 'var(--muted)', fontSize: 12, pointerEvents: 'none' }}>

@@ -7,6 +7,7 @@ import Torneos from './Torneos.jsx'
 import Reservas from './Reservas.jsx'
 import Perfil from './Perfil.jsx'
 import { IconHome, IconCard, IconCalendar, IconTrophy, IconUser } from '../components/Icons.jsx'
+import ErrorBoundary from '../components/ErrorBoundary.jsx'
 
 const TABS = [
   { id: 'inicio', label: 'Inicio', Icon: IconHome },
@@ -31,11 +32,13 @@ export default function ClientApp() {
   return (
     <div className="phone">
       <div className="phone-scroll">
-        {screen === 'inicio' && <Inicio goTo={setScreen} />}
-        {screen === 'tarjeta' && <Tarjeta />}
-        {screen === 'reservas' && <Reservas />}
-        {screen === 'torneos' && <Torneos />}
-        {screen === 'perfil' && <Perfil />}
+        <ErrorBoundary resetKey={screen}>
+          {screen === 'inicio' && <Inicio goTo={setScreen} />}
+          {screen === 'tarjeta' && <Tarjeta />}
+          {screen === 'reservas' && <Reservas />}
+          {screen === 'torneos' && <Torneos />}
+          {screen === 'perfil' && <Perfil />}
+        </ErrorBoundary>
       </div>
       <nav className="tabbar">
         {TABS.map(({ id, label, Icon }) => (

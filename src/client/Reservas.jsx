@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth.jsx'
-import { HOURS, DAY_SHORT, ymd, slotDates } from '../lib/util'
+import { HOURS, DAY_SHORT, ymd, slotDates, dayRangeISO } from '../lib/util'
 
 export default function Reservas() {
   const { session } = useAuth()
@@ -29,10 +29,11 @@ export default function Reservas() {
   }, [])
 
   async function loadDay() {
+    const [fromISO, toISO] = dayRangeISO(dayStr)
     const [{ data: occ }, { data: my }] = await Promise.all([
-      supabase.rpc('get_court_availability', { p_day: dayStr }),
+      supabase.rpc('get_court_availability', { p_from: fromISO, p_to: toISO }),
       supabase.from('reservations').select('*').eq('member_id', session.user.id)
-        .gte('starts_at', `${dayStr}T00:00:00`).lt('starts_at', `${dayStr}T23:59:59`)
+        .gte('starts_at', fromISO).lt('starts_at', toISO)
         .neq('status', 'cancelled'),
     ])
     setOccupied(occ ?? [])

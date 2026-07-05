@@ -174,14 +174,16 @@ create table public.reservations (
   ) where (status <> 'cancelled')
 );
 
--- Disponibilidad para el cliente SIN exponer nombres de otros socios
-create or replace function public.get_court_availability(p_day date)
+-- Disponibilidad para el cliente SIN exponer nombres de otros socios.
+-- Recibe el rango exacto (inicio/fin del día LOCAL) para no perder reservas
+-- nocturnas por diferencia de zona horaria con UTC.
+create or replace function public.get_court_availability(p_from timestamptz, p_to timestamptz)
 returns table (court_id bigint, court_name text, starts_at timestamptz, ends_at timestamptz)
 language sql stable security definer set search_path = public as $$
   select r.court_id, c.name, r.starts_at, r.ends_at
   from reservations r join courts c on c.id = r.court_id
   where r.status in ('pending','confirmed','blocked')
-    and r.starts_at::date = p_day
+    and r.starts_at < p_to and r.ends_at > p_from
 $$;
 
 -- ------------------------------------------------------------

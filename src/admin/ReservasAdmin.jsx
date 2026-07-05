@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { HOURS, ymd, slotDates } from '../lib/util'
+import { HOURS, ymd, slotDates, dayRangeISO } from '../lib/util'
 
 export default function ReservasAdmin() {
   const [courts, setCourts] = useState([])
@@ -14,9 +14,10 @@ export default function ReservasAdmin() {
   }, [])
 
   async function load() {
+    const [fromISO, toISO] = dayRangeISO(day)
     const { data } = await supabase.from('reservations')
       .select('*, profiles(full_name)')
-      .gte('starts_at', `${day}T00:00:00`).lt('starts_at', `${day}T23:59:59`)
+      .gte('starts_at', fromISO).lt('starts_at', toISO)
       .neq('status', 'cancelled')
       .order('starts_at')
     setReservas(data ?? [])

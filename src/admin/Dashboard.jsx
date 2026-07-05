@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { HOURS, DAY_SHORT, ymd } from '../lib/util'
+import { HOURS, DAY_SHORT, ymd, dayRangeISO } from '../lib/util'
 
 export default function Dashboard() {
   const [kpis, setKpis] = useState(null)
@@ -9,17 +9,17 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const hoy = ymd(new Date())
+      const [hoyDesde, hoyHasta] = dayRangeISO(ymd(new Date()))
       const hace7 = new Date(); hace7.setDate(hace7.getDate() - 6); hace7.setHours(0, 0, 0, 0)
       const hace28 = new Date(); hace28.setDate(hace28.getDate() - 28)
       const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0, 0, 0, 0)
 
       const [visHoy, socios, courts, resHoy, canjes, visSemana, res28] = await Promise.all([
-        supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', `${hoy}T00:00:00`),
+        supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', hoyDesde).lt('created_at', hoyHasta),
         supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_active', true),
         supabase.from('courts').select('id', { count: 'exact', head: true }).eq('is_active', true),
         supabase.from('reservations').select('id', { count: 'exact', head: true })
-          .gte('starts_at', `${hoy}T00:00:00`).lt('starts_at', `${hoy}T23:59:59`).in('status', ['confirmed', 'pending']),
+          .gte('starts_at', hoyDesde).lt('starts_at', hoyHasta).in('status', ['confirmed', 'pending']),
         supabase.from('redemptions').select('id', { count: 'exact', head: true }).gte('created_at', inicioMes.toISOString()),
         supabase.from('visits').select('created_at').gte('created_at', hace7.toISOString()),
         supabase.from('reservations').select('starts_at').gte('starts_at', hace28.toISOString()).neq('status', 'cancelled'),
