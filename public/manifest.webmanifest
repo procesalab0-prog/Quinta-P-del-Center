@@ -1,0 +1,13 @@
+{
+  "name": "Quinta Padel Center",
+  "short_name": "Quinta Padel",
+  "description": "Tu club de pádel · tarjeta de lealtad, reservas y torneos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0B09",
+  "theme_color": "#0A0B09",
+  "lang": "es",
+  "icons": [
+    { "src": "/assets/logo-mark-square.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

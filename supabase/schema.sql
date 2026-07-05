@@ -50,11 +50,13 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- Un socio no puede cambiarse a sí mismo rol, sellos, nivel ni código
+-- Un socio no puede cambiarse a sí mismo rol, sellos, nivel ni código.
+-- auth.uid() es null cuando se ejecuta desde el dashboard/servidor: se permite
+-- (necesario para crear al primer admin; RLS ya bloquea a los anónimos vía API).
 create or replace function public.protect_profile_fields() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if not public.is_staff() then
+  if auth.uid() is not null and not public.is_staff() then
     new.role         := old.role;
     new.stamps       := old.stamps;
     new.total_visits := old.total_visits;
