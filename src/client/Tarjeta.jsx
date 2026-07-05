@@ -7,6 +7,7 @@ export default function Tarjeta() {
   const { profile, settings } = useAuth()
   const [qr, setQr] = useState(null)
   const [flipped, setFlipped] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const perReward = settings?.stamps_per_reward ?? 10
   const stamps = profile?.stamps ?? 0
@@ -20,6 +21,57 @@ export default function Tarjeta() {
 
   if (!profile) return null
   const socio = memberNumber(profile.member_code)
+
+  // Copia el código del socio al portapapeles
+  async function copiarCodigo() {
+    try {
+      await navigator.clipboard.writeText(profile.member_code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      window.prompt('Copia tu código de socio:', profile.member_code)
+    }
+  }
+
+  // Genera una imagen (PNG) del QR con nombre y número de socio, y la descarga
+  async function guardarQR() {
+    const W = 720, H = 900
+    const canvas = document.createElement('canvas')
+    canvas.width = W; canvas.height = H
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#0A0B09'; ctx.fillRect(0, 0, W, H)
+
+    // Título
+    ctx.fillStyle = '#D7F23C'
+    ctx.font = 'bold 46px Oswald, Arial, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('QUINTA PADEL CENTER', W / 2, 90)
+
+    // QR en un recuadro claro
+    const qrData = await QRCode.toDataURL(profile.member_code, { width: 560, margin: 1, color: { dark: '#101110', light: '#F5F6F1' } })
+    const img = new Image()
+    await new Promise(res => { img.onload = res; img.src = qrData })
+    const qrSize = 500, qx = (W - qrSize) / 2, qy = 160
+    ctx.fillStyle = '#F5F6F1'
+    ctx.fillRect(qx - 20, qy - 20, qrSize + 40, qrSize + 40)
+    ctx.drawImage(img, qx, qy, qrSize, qrSize)
+
+    // Nombre y número
+    ctx.fillStyle = '#F5F6F1'
+    ctx.font = 'bold 40px Inter, Arial, sans-serif'
+    ctx.fillText(profile.full_name || 'Socio', W / 2, qy + qrSize + 90)
+    ctx.fillStyle = '#8C9086'
+    ctx.font = '28px Inter, Arial, sans-serif'
+    ctx.fillText(`SOCIO N.º ${socio}`, W / 2, qy + qrSize + 140)
+    ctx.font = '22px Inter, Arial, sans-serif'
+    ctx.fillText('Presenta este código en recepción', W / 2, qy + qrSize + 185)
+
+    const url = canvas.toDataURL('image/png')
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `QR-${socio}.png`
+    a.click()
+  }
 
   return (
     <div style={{ animation: 'qpc-fadein 0.25s ease' }}>
@@ -75,6 +127,14 @@ export default function Tarjeta() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Guardar / compartir QR */}
+      <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+        <button className="btn-outline" style={{ flex: 1, padding: '11px 6px', fontSize: 12 }} onClick={guardarQR}>⬇ Guardar QR</button>
+        <button className="btn-outline" style={{ flex: 1, padding: '11px 6px', fontSize: 12 }} onClick={copiarCodigo}>
+          {copied ? '✓ Copiado' : '⧉ Copiar código'}
+        </button>
       </div>
 
       {/* Sellos */}
