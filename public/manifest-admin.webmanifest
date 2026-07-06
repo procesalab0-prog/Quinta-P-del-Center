@@ -1,0 +1,14 @@
+{
+  "name": "Administración",
+  "short_name": "Administración",
+  "description": "Panel de administración · Quinta Padel Center",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "background_color": "#0A0B09",
+  "theme_color": "#0A0B09",
+  "lang": "es",
+  "icons": [
+    { "src": "/icon-admin.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ]
+}

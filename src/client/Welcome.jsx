@@ -35,7 +35,8 @@ export default function Welcome() {
 
   const bgStyle = {
     flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center', padding: '40px 28px',
+    justifyContent: 'center',
+    padding: 'calc(40px + env(safe-area-inset-top)) 28px calc(40px + env(safe-area-inset-bottom))',
     backgroundImage: "linear-gradient(180deg, rgba(10,11,9,0.55), rgba(10,11,9,0.94)), url('/assets/racket-texture.jpeg')",
     backgroundSize: 'cover', backgroundPosition: 'center',
   }

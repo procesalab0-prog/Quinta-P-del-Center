@@ -13,11 +13,14 @@ function useHomeScreenIdentity() {
     const icon = document.getElementById('apple-icon')
     const favicon = document.querySelector("link[rel='icon']")
     const title = document.getElementById('apple-title')
+    const manifest = document.getElementById('manifest-link')
     const href = isAdmin ? '/icon-admin.png' : '/icon-socios.png'
     if (icon) icon.href = href
     if (favicon) favicon.href = href
-    if (title) title.setAttribute('content', isAdmin ? 'Administracion' : 'Quinta Padel')
-    document.title = isAdmin ? 'Administracion' : 'Quinta Padel Center'
+    if (title) title.setAttribute('content', isAdmin ? 'Administración' : 'Quinta Padel')
+    // El manifiesto define en qué URL arranca la app instalada (/ o /admin)
+    if (manifest) manifest.setAttribute('href', isAdmin ? '/manifest-admin.webmanifest' : '/manifest.webmanifest')
+    document.title = isAdmin ? 'Administración' : 'Quinta Padel Center'
   }, [pathname])
 }
 
