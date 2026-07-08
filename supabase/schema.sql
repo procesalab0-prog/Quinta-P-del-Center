@@ -149,6 +149,33 @@ create table public.tournament_registrations (
   unique (tournament_id, member_id)
 );
 
+-- Rol de juego del torneo (partidos programados y resultados)
+create table public.tournament_matches (
+  id            bigint generated always as identity primary key,
+  tournament_id bigint not null references public.tournaments(id) on delete cascade,
+  round         text not null default 'Grupos',
+  court_id      bigint references public.courts(id),
+  starts_at     timestamptz,
+  pair1_reg_id  bigint references public.tournament_registrations(id) on delete set null,
+  pair1_label   text,
+  pair2_reg_id  bigint references public.tournament_registrations(id) on delete set null,
+  pair2_label   text,
+  score         text,
+  winner        int check (winner in (1, 2)),
+  status        text not null default 'scheduled'
+                check (status in ('scheduled','playing','done','cancelled')),
+  created_at    timestamptz not null default now()
+);
+
+-- Mensajes del torneo para los inscritos
+create table public.tournament_messages (
+  id            bigint generated always as identity primary key,
+  tournament_id bigint not null references public.tournaments(id) on delete cascade,
+  body          text not null,
+  created_by    uuid references public.profiles(id),
+  created_at    timestamptz not null default now()
+);
+
 -- ------------------------------------------------------------
 -- 4. CANCHAS Y RESERVAS
 -- ------------------------------------------------------------
@@ -323,6 +350,18 @@ create policy "cancelar mi inscripcion o staff" on public.tournament_registratio
   for delete using (member_id = auth.uid() or public.is_staff());
 create policy "staff marca pagos" on public.tournament_registrations
   for update using (public.is_staff());
+
+-- tournament_matches / tournament_messages
+alter table public.tournament_matches  enable row level security;
+alter table public.tournament_messages enable row level security;
+create policy "ver partidos" on public.tournament_matches
+  for select using (auth.uid() is not null);
+create policy "staff administra partidos" on public.tournament_matches
+  for all using (public.is_staff());
+create policy "ver mensajes torneo" on public.tournament_messages
+  for select using (auth.uid() is not null);
+create policy "staff administra mensajes torneo" on public.tournament_messages
+  for all using (public.is_staff());
 
 -- courts
 create policy "ver canchas" on public.courts

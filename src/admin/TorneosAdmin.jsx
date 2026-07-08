@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtDateShort, timeAgo } from '../lib/util'
+import { MATCH_EMBED, nextMatchFor, opponentName, fmtMatchTime, waLink } from '../lib/torneo'
+import RolTorneo from './RolTorneo.jsx'
 
 export default function TorneosAdmin() {
   const [tab, setTab] = useState('torneos')
   const [tournaments, setTournaments] = useState([])
   const [avisos, setAvisos] = useState([])
   const [drawer, setDrawer] = useState(null) // {type:'torneo'|'aviso', data:{}}
-  const [inscritos, setInscritos] = useState(null) // {torneo, list}
+  const [inscritos, setInscritos] = useState(null) // {torneo, list, matches}
+  const [rol, setRol] = useState(null) // torneo cuyo rol de juego está abierto
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -117,9 +120,21 @@ export default function TorneosAdmin() {
   }
 
   async function verInscritos(t) {
-    const { data } = await supabase.from('tournament_registrations')
-      .select('*, profiles(full_name, phone)').eq('tournament_id', t.id).order('created_at')
-    setInscritos({ torneo: t, list: data ?? [] })
+    const [{ data }, { data: matches }] = await Promise.all([
+      supabase.from('tournament_registrations')
+        .select('*, profiles(full_name, phone)').eq('tournament_id', t.id).order('created_at'),
+      supabase.from('tournament_matches').select(MATCH_EMBED).eq('tournament_id', t.id),
+    ])
+    setInscritos({ torneo: t, list: data ?? [], matches: matches ?? [] })
+  }
+
+  // Mensaje de WhatsApp con el horario del partido de ese inscrito
+  function waMensaje(reg) {
+    const nombre = (reg.profiles?.full_name || '').split(' ')[0]
+    const m = nextMatchFor(inscritos.matches, reg.id)
+    if (!m) return `Hola ${nombre}! 🎾 Te confirmamos tu inscripción a "${inscritos.torneo.title}" en Quinta Padel Center. En cuanto esté el rol de juego te avisamos por aquí. ¡Nos vemos en la cancha!`
+    const cancha = m.courts?.name ? ` en ${m.courts.name}` : ''
+    return `Hola ${nombre}! 🎾 "${inscritos.torneo.title}" — tu partido (${m.round}) es ${fmtMatchTime(m.starts_at)}${cancha} vs ${opponentName(m, reg.id)}. ¡Te esperamos en Quinta Padel Center!`
   }
 
   async function togglePago(reg) {
@@ -162,6 +177,7 @@ export default function TorneosAdmin() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 14, fontSize: 13, flexShrink: 0, alignItems: 'center' }}>
+            <button className="link-lime" onClick={() => setRol(t)}>Rol de juego</button>
             <button className="link-lime" onClick={() => verInscritos(t)}>Inscritos</button>
             <span style={{ cursor: 'pointer', color: 'var(--muted)' }} onClick={() => edit('torneo', t)}>✎</span>
             <span style={{ cursor: 'pointer', color: 'var(--muted)' }} onClick={() => borrar('torneo', t.id)}>🗑</span>
@@ -272,24 +288,33 @@ export default function TorneosAdmin() {
             {inscritos.list.length === 0 && <div style={{ color: 'var(--faint)', fontSize: 13 }}>Nadie inscrito todavía.</div>}
             {inscritos.list.map(reg => (
               <div key={reg.id} style={{ borderBottom: '1px solid var(--line-soft)', padding: '10px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{reg.profiles?.full_name}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                     {reg.partner_name ? `Pareja: ${reg.partner_name}` : 'Sin pareja'}{reg.category ? ` · ${reg.category}` : ''}
-                    {reg.profiles?.phone ? ` · 📞 ${reg.profiles.phone}` : ''}
                   </div>
                 </div>
-                <div onClick={() => togglePago(reg)} style={{
-                  cursor: 'pointer', fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 999, flexShrink: 0,
-                  background: reg.is_paid ? 'var(--lime)' : 'transparent',
-                  color: reg.is_paid ? '#101110' : 'var(--lime)',
-                  border: reg.is_paid ? 'none' : '1px solid var(--lime)',
-                }}>{reg.is_paid ? 'PAGADO' : 'PENDIENTE'}</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                  {reg.profiles?.phone && (
+                    <a href={waLink(reg.profiles.phone, waMensaje(reg))} target="_blank" rel="noreferrer" title="Enviar horario por WhatsApp"
+                      style={{ background: '#25D366', color: '#fff', fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 999, textDecoration: 'none' }}>
+                      WhatsApp
+                    </a>
+                  )}
+                  <div onClick={() => togglePago(reg)} style={{
+                    cursor: 'pointer', fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 999,
+                    background: reg.is_paid ? 'var(--lime)' : 'transparent',
+                    color: reg.is_paid ? '#101110' : 'var(--lime)',
+                    border: reg.is_paid ? 'none' : '1px solid var(--lime)',
+                  }}>{reg.is_paid ? 'PAGADO' : 'PENDIENTE'}</div>
+                </div>
               </div>
             ))}
           </div>
         </>
       )}
+
+      {rol && <RolTorneo torneo={rol} onClose={() => setRol(null)} />}
     </div>
   )
 }

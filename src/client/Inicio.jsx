@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth.jsx'
 import { MONTH_SHORT, timeAgo } from '../lib/util'
+import { MATCH_EMBED, opponentName, fmtMatchTime } from '../lib/torneo'
 import Countdown from '../components/Countdown.jsx'
 
 export default function Inicio({ goTo, openDetail }) {
+  const { session } = useAuth()
   const [featured, setFeatured] = useState(null)
   const [avisos, setAvisos] = useState([])
   const [courtCount, setCourtCount] = useState(null)
+  const [miPartido, setMiPartido] = useState(null) // {match, regId}
 
   useEffect(() => {
     supabase.from('tournaments').select('*').eq('is_published', true)
@@ -17,6 +21,25 @@ export default function Inicio({ goTo, openDetail }) {
       .then(({ data }) => setAvisos(data ?? []))
     supabase.from('courts').select('id', { count: 'exact', head: true }).eq('is_active', true)
       .then(({ count }) => setCourtCount(count))
+
+    // Mi próximo partido de torneo (si estoy inscrito y ya hay rol de juego)
+    async function loadMiPartido() {
+      const { data: regs } = await supabase.from('tournament_registrations')
+        .select('id').eq('member_id', session.user.id)
+      if (!regs?.length) return
+      const ids = regs.map(r => r.id).join(',')
+      const { data: m } = await supabase.from('tournament_matches')
+        .select(`${MATCH_EMBED}, tournaments(id, title)`)
+        .or(`pair1_reg_id.in.(${ids}),pair2_reg_id.in.(${ids})`)
+        .in('status', ['scheduled', 'playing'])
+        .gte('starts_at', new Date(Date.now() - 2 * 3600000).toISOString())
+        .order('starts_at').limit(1)
+      if (m?.[0]) {
+        const regId = regs.find(r => r.id === m[0].pair1_reg_id || r.id === m[0].pair2_reg_id)?.id
+        setMiPartido({ match: m[0], regId })
+      }
+    }
+    loadMiPartido()
   }, [])
 
   return (
@@ -40,6 +63,22 @@ export default function Inicio({ goTo, openDetail }) {
         <button className="btn-lime" style={{ flex: 1, fontSize: 12.5, padding: '13px 6px' }} onClick={() => goTo('tarjeta')}>Ver mi tarjeta</button>
         <button className="btn-outline" style={{ flex: 1, fontSize: 12.5, padding: '13px 6px' }} onClick={() => goTo('reservas')}>Reservar cancha</button>
       </div>
+
+      {/* Tu próximo partido de torneo */}
+      {miPartido && (
+        <div onClick={() => openDetail('torneo', miPartido.match.tournaments?.id)}
+          style={{ background: 'linear-gradient(135deg, rgba(215,242,60,0.16), rgba(215,242,60,0.04))', border: '1px solid rgba(215,242,60,0.45)', borderRadius: 16, padding: 16, marginBottom: 24, cursor: 'pointer', animation: 'qpc-fadein 0.3s ease' }}>
+          <div className="h-section" style={{ fontSize: 14, marginBottom: 8 }}>🎾 Tu próximo partido</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>
+            {miPartido.match.tournaments?.title} · {miPartido.match.round}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>vs {opponentName(miPartido.match, miPartido.regId)}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+            {fmtMatchTime(miPartido.match.starts_at)}{miPartido.match.courts?.name ? ` · ${miPartido.match.courts.name}` : ''}
+          </div>
+          <Countdown target={miPartido.match.starts_at} variant="evento" compact />
+        </div>
+      )}
 
       {featured && (
         <>
