@@ -35,6 +35,7 @@ export default function Config({ isAdmin }) {
       open_hour: open,
       close_hour: close,
       reservation_slot_minutes: slot,
+      court_price: settings.court_price !== '' && settings.court_price != null ? Number(settings.court_price) : 0,
     }).eq('id', 1)
     if (error) { setSaveError('No se pudo guardar: ' + error.message); return }
     setSaved(true); setTimeout(() => setSaved(false), 2000)
@@ -77,6 +78,11 @@ export default function Config({ isAdmin }) {
           <input className="input" type="number" min="15" max="240" step="15" style={{ width: 90 }} disabled={!isAdmin}
             value={settings.reservation_slot_minutes ?? 90}
             onChange={e => setSettings({ ...settings, reservation_slot_minutes: e.target.value })} />
+        </Row>
+        <Row label="Precio de cancha por defecto ($)">
+          <input className="input" type="number" min="0" style={{ width: 90 }} disabled={!isAdmin}
+            value={settings.court_price ?? 0}
+            onChange={e => setSettings({ ...settings, court_price: e.target.value })} />
         </Row>
         <Row label="Sellos para completar la tarjeta">
           <input className="input" type="number" min="1" style={{ width: 90 }} disabled={!isAdmin}

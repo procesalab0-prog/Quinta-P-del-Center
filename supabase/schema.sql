@@ -82,7 +82,8 @@ create table public.loyalty_settings (
   gold_visits              int not null default 50,
   open_hour                int not null default 8,       -- horario de reservas
   close_hour               int not null default 23,
-  reservation_slot_minutes int not null default 90       -- duración de cada reserva
+  reservation_slot_minutes int not null default 90,      -- duración de cada reserva
+  court_price              numeric(10,2) not null default 0  -- precio de cancha por defecto
 );
 insert into public.loyalty_settings (id) values (1);
 
@@ -206,6 +207,8 @@ create table public.reservations (
   status        text not null default 'pending'
                 check (status in ('pending','confirmed','cancelled','blocked')),
   is_paid       boolean not null default false,
+  price         numeric(10,2),
+  customer_phone text,
   notes         text,
   created_by    uuid references public.profiles(id),
   created_at    timestamptz not null default now(),
@@ -214,6 +217,15 @@ create table public.reservations (
     court_id with =,
     tstzrange(starts_at, ends_at) with &&
   ) where (status <> 'cancelled')
+);
+
+-- Avisos que el club manda a una reserva (aparecen en la app del socio)
+create table public.reservation_messages (
+  id             bigint generated always as identity primary key,
+  reservation_id bigint not null references public.reservations(id) on delete cascade,
+  body           text not null,
+  created_by     uuid references public.profiles(id),
+  created_at     timestamptz not null default now()
 );
 
 -- Disponibilidad para el cliente SIN exponer nombres de otros socios.
@@ -361,6 +373,16 @@ create policy "cancelar mi inscripcion o staff" on public.tournament_registratio
   for delete using (member_id = auth.uid() or public.is_staff());
 create policy "staff marca pagos" on public.tournament_registrations
   for update using (public.is_staff());
+
+-- reservation_messages: el socio ve los avisos de sus reservas; staff administra
+alter table public.reservation_messages enable row level security;
+create policy "ver avisos de mi reserva o staff" on public.reservation_messages
+  for select using (
+    public.is_staff()
+    or exists (select 1 from reservations r where r.id = reservation_id and r.member_id = auth.uid())
+  );
+create policy "staff administra avisos reserva" on public.reservation_messages
+  for all using (public.is_staff());
 
 -- tournament_matches / tournament_messages
 alter table public.tournament_matches  enable row level security;

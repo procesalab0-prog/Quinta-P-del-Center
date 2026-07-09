@@ -35,7 +35,7 @@ export default function Reservas() {
   // Todas mis reservas próximas (las haga yo o las agende el club en el admin)
   async function loadUpcoming() {
     const { data } = await supabase.from('reservations')
-      .select('*, courts(name)')
+      .select('*, courts(name), reservation_messages(id, body, created_at)')
       .eq('member_id', session.user.id)
       .gte('ends_at', new Date().toISOString())
       .neq('status', 'cancelled')
@@ -45,12 +45,13 @@ export default function Reservas() {
   }
   useEffect(() => { loadUpcoming() }, [])
 
-  // Se actualiza en vivo si el club agenda, confirma o cancela una reserva mía
+  // Se actualiza en vivo si el club agenda/confirma/cancela mi reserva o me manda un aviso
   useEffect(() => {
     const ch = supabase.channel('mis-reservas')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'reservations', filter: `member_id=eq.${session.user.id}` },
         () => loadUpcoming())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservation_messages' }, () => loadUpcoming())
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
@@ -115,18 +116,27 @@ export default function Reservas() {
               : r.status === 'blocked'
                 ? { txt: 'Bloqueo', color: 'var(--muted)' }
                 : { txt: 'Por confirmar', color: '#F4D35E' }
+            const avisos = (r.reservation_messages ?? []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
             return (
-              <div key={r.id} className="card" style={{ padding: 14, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{r.courts?.name ?? 'Cancha'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
-                    {DAY_SHORT[d.getDay()]} {d.getDate()} · {hhmm(d)}–{hhmm(end)}
-                    {r.is_paid ? ' · pagada' : ''}
+              <div key={r.id} className="card" style={{ padding: 14, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{r.courts?.name ?? 'Cancha'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
+                      {DAY_SHORT[d.getDay()]} {d.getDate()} · {hhmm(d)}–{hhmm(end)}
+                      {r.price ? ` · $${Number(r.price).toLocaleString()}` : ''}
+                      {r.is_paid ? ' · pagada' : ''}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: estado.color, border: `1px solid ${estado.color}`, borderRadius: 999, padding: '5px 10px', whiteSpace: 'nowrap' }}>
+                    {estado.txt}
                   </div>
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: estado.color, border: `1px solid ${estado.color}`, borderRadius: 999, padding: '5px 10px', whiteSpace: 'nowrap' }}>
-                  {estado.txt}
-                </div>
+                {avisos.map(a => (
+                  <div key={a.id} style={{ marginTop: 10, background: 'rgba(215,242,60,0.08)', border: '1px solid rgba(215,242,60,0.25)', borderRadius: 10, padding: '8px 10px', fontSize: 12.5 }}>
+                    📣 {a.body}
+                  </div>
+                ))}
               </div>
             )
           })}
