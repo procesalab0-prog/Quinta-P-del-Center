@@ -12,6 +12,7 @@ export default function Reservas() {
   const [courtId, setCourtId] = useState(null)
   const [occupied, setOccupied] = useState([]) // rangos ocupados del día (sin nombres)
   const [mine, setMine] = useState([])         // mis reservas del día
+  const [myWait, setMyWait] = useState([])     // mis esperas del día
   const [slot, setSlot] = useState(null)
   const [confirmed, setConfirmed] = useState(false)
   const [error, setError] = useState('')
@@ -58,14 +59,35 @@ export default function Reservas() {
 
   async function loadDay() {
     const [fromISO, toISO] = dayRangeISO(dayStr)
-    const [{ data: occ }, { data: my }] = await Promise.all([
+    const [{ data: occ }, { data: my }, { data: wl }] = await Promise.all([
       supabase.rpc('get_court_availability', { p_from: fromISO, p_to: toISO }),
       supabase.from('reservations').select('*').eq('member_id', session.user.id)
         .gte('starts_at', fromISO).lt('starts_at', toISO)
         .neq('status', 'cancelled'),
+      supabase.from('reservation_waitlist').select('*').eq('member_id', session.user.id)
+        .gte('starts_at', fromISO).lt('starts_at', toISO),
     ])
     setOccupied(occ ?? [])
     setMine(my ?? [])
+    setMyWait(wl ?? [])
+  }
+
+  async function toggleWaitlist(hour) {
+    const { start, end } = slotDates(dayStr, hour, slotMinutes)
+    const existing = myWait.find(w => w.court_id === courtId && new Date(w.starts_at).getTime() === start.getTime())
+    if (existing) {
+      await supabase.from('reservation_waitlist').delete().eq('id', existing.id)
+    } else {
+      await supabase.from('reservation_waitlist').insert({
+        court_id: courtId, member_id: session.user.id,
+        starts_at: start.toISOString(), ends_at: end.toISOString(),
+      })
+    }
+    loadDay()
+  }
+  function inWaitlist(hour) {
+    const { start } = slotDates(dayStr, hour, slotMinutes)
+    return myWait.some(w => w.court_id === courtId && new Date(w.starts_at).getTime() === start.getTime())
   }
   useEffect(() => { loadDay(); setSlot(null); setConfirmed(false); setError('') }, [dayStr])
 
@@ -164,11 +186,18 @@ export default function Reservas() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {HOURS.map(h => {
           const st = slotState(h)
+          const waiting = st === 'occupied' && inWaitlist(h)
           return (
             <div key={h} className={`slot ${st === 'occupied' ? 'occupied' : ''} ${st === 'mine' || (slot === h && st === 'free') ? 'mine' : ''}`}
-              onClick={() => { if (st === 'free') { setSlot(h); setConfirmed(false) } }}>
+              style={waiting ? { borderColor: '#F4D35E', color: '#F4D35E' } : undefined}
+              onClick={() => {
+                if (st === 'free') { setSlot(h); setConfirmed(false) }
+                else if (st === 'occupied') toggleWaitlist(h)
+              }}>
               <div className="slot-h">{h}</div>
-              <div className="slot-l">{st === 'mine' ? 'Tu reserva' : st === 'occupied' ? 'Ocupado' : slot === h ? 'Seleccionado' : 'Disponible'}</div>
+              <div className="slot-l">
+                {st === 'mine' ? 'Tu reserva' : st === 'occupied' ? (waiting ? '⏳ En espera' : 'Ocupado · avísame') : slot === h ? 'Seleccionado' : 'Disponible'}
+              </div>
             </div>
           )
         })}

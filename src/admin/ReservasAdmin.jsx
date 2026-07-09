@@ -19,6 +19,15 @@ export default function ReservasAdmin() {
   const [resMsgs, setResMsgs] = useState([])   // avisos de la reserva en edición
   const [avisoText, setAvisoText] = useState('')
   const [waText, setWaText] = useState('')      // mensaje editable de confirmación
+  const [waitlist, setWaitlist] = useState([])  // lista de espera del día
+
+  // Corte de caja del día
+  const caja = useMemo(() => {
+    const activas = reservas.filter(r => r.status !== 'blocked')
+    const cobrado = activas.filter(r => r.is_paid).reduce((s, r) => s + Number(r.price || 0), 0)
+    const pendiente = activas.filter(r => !r.is_paid).reduce((s, r) => s + Number(r.price || 0), 0)
+    return { cobrado, pendiente, total: cobrado + pendiente, count: activas.length }
+  }, [reservas])
 
   useEffect(() => {
     supabase.from('courts').select('*').eq('is_active', true).order('id').then(({ data }) => setCourts(data ?? []))
@@ -36,6 +45,11 @@ export default function ReservasAdmin() {
     if (error) { setLoadError('No se pudieron cargar las reservas: ' + error.message); return }
     setLoadError('')
     setReservas(data ?? [])
+    // Lista de espera del día
+    const { data: wl } = await supabase.from('reservation_waitlist')
+      .select('*, profiles(full_name, phone)')
+      .gte('starts_at', fromISO).lt('starts_at', toISO).order('starts_at')
+    setWaitlist(wl ?? [])
   }
   useEffect(() => { load() }, [day])
 
@@ -63,6 +77,7 @@ export default function ReservasAdmin() {
         court_id: courtId ?? courts[0]?.id, member_id: null, customer_name: '', customer_phone: '',
         startTime, endTime: addMinutes(startTime, slotMinutes),
         price: defaultPrice ? String(defaultPrice) : '', is_paid: false, status: 'confirmed', notes: '',
+        repeatWeeks: 0,
       },
     })
   }
@@ -93,6 +108,7 @@ export default function ReservasAdmin() {
         status: d.status, is_paid: d.is_paid,
         price: d.price !== '' ? Number(d.price) : null,
         notes: d.notes?.trim() || null,
+        no_show: !!d.no_show,
       }, start, end,
     }
   }
@@ -104,6 +120,26 @@ export default function ReservasAdmin() {
     if (end <= start) { setError('La hora de fin debe ser mayor que la de inicio.'); return }
     if (drawer.mode === 'new' && start < new Date()) { setError('No puedes crear una reserva en un horario que ya pasó.'); return }
     if (drawer.mode === 'new') {
+      const weeks = Number(d.repeatWeeks) || 0
+      if (weeks > 0) {
+        // Reserva recurrente: una fila por semana (misma hora), ligadas por grupo
+        const group = crypto.randomUUID()
+        const rows = []
+        for (let i = 0; i <= weeks; i++) {
+          const s = new Date(start.getTime() + i * 7 * 86400000)
+          const e = new Date(end.getTime() + i * 7 * 86400000)
+          rows.push({ ...row, starts_at: s.toISOString(), ends_at: e.toISOString(), recurrence_group: group })
+        }
+        // Insertamos una por una para saltar las que choquen sin abortar todo
+        let ok = 0, choques = 0
+        for (const r of rows) {
+          const { error } = await supabase.from('reservations').insert(r)
+          if (error) choques++; else ok++
+        }
+        setDrawer(null); load()
+        if (choques > 0) alert(`Se crearon ${ok} reservas. ${choques} semana(s) ya estaban ocupadas y se omitieron.`)
+        return
+      }
       const { error } = await supabase.from('reservations').insert(row)
       if (error) { setError(msgError(error)); return }
     } else {
@@ -116,6 +152,11 @@ export default function ReservasAdmin() {
   async function cancelar() {
     await supabase.from('reservations').update({ status: 'cancelled' }).eq('id', drawer.data.id)
     setDrawer(null); load()
+  }
+
+  async function quitarEspera(id) {
+    await supabase.from('reservation_waitlist').delete().eq('id', id)
+    load()
   }
 
   async function enviarAviso() {
@@ -166,6 +207,33 @@ export default function ReservasAdmin() {
       </div>
 
       {loadError && <div className="error-note" style={{ marginBottom: 12 }}>{loadError}</div>}
+
+      {/* Corte de caja del día */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 14 }}>
+        <CajaCard label="Reservas" value={caja.count} />
+        <CajaCard label="Cobrado" value={`$${caja.cobrado.toLocaleString()}`} lime />
+        <CajaCard label="Pendiente" value={`$${caja.pendiente.toLocaleString()}`} />
+        <CajaCard label="Total del día" value={`$${caja.total.toLocaleString()}`} />
+      </div>
+
+      {/* Lista de espera del día */}
+      {waitlist.length > 0 && (
+        <div className="card" style={{ padding: 12, marginBottom: 14, borderColor: 'rgba(244,211,94,0.4)' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#F4D35E', marginBottom: 8 }}>⏳ Lista de espera ({waitlist.length})</div>
+          {waitlist.map(w => (
+            <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12, padding: '4px 0' }}>
+              <span>{w.profiles?.full_name} · {courts.find(c => c.id === w.court_id)?.name} · {hourOf(w.starts_at)}–{hourOf(w.ends_at)}</span>
+              <span style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                {w.profiles?.phone && (
+                  <a href={waLink(w.profiles.phone, `Hola ${(w.profiles.full_name || '').split(' ')[0]}! 🎾 Se liberó el horario que esperabas en Quinta Padel Center (${courts.find(c => c.id === w.court_id)?.name}, ${hourOf(w.starts_at)}). ¿Lo quieres?`)}
+                    target="_blank" rel="noreferrer" style={{ color: '#25D366', textDecoration: 'none', fontWeight: 700 }}>WhatsApp</a>
+                )}
+                <span style={{ cursor: 'pointer', color: 'var(--muted)' }} onClick={() => quitarEspera(w.id)}>✕</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={{ overflowX: 'auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${courts.length}, minmax(110px, 1fr))`, gap: 6, minWidth: courts.length * 120 + 70 }}>
@@ -234,6 +302,17 @@ export default function ReservasAdmin() {
             </div>
             <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: -8, marginBottom: 14 }}>Fecha: {day} · puedes poner cualquier duración</div>
 
+            {drawer.mode === 'new' && (
+              <>
+                <div className="field-label">Repetir cada semana</div>
+                <select className="input" style={{ marginBottom: 14 }} value={d.repeatWeeks}
+                  onChange={e => setDrawer(dr => ({ ...dr, data: { ...dr.data, repeatWeeks: Number(e.target.value) } }))}>
+                  <option value={0}>No repetir</option>
+                  {[4, 8, 12].map(w => <option key={w} value={w}>Sí, por {w} semanas</option>)}
+                </select>
+              </>
+            )}
+
             <div className="field-label">Estado</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               {[['confirmed', 'Confirmada'], ['pending', 'Pendiente'], ['blocked', 'Bloqueo']].map(([v, l]) => (
@@ -247,6 +326,13 @@ export default function ReservasAdmin() {
               <Toggle active={d.is_paid} label="Pagado" onClick={() => setDrawer(dr => ({ ...dr, data: { ...dr.data, is_paid: true } }))} />
               <Toggle active={!d.is_paid} label="Pendiente" onClick={() => setDrawer(dr => ({ ...dr, data: { ...dr.data, is_paid: false } }))} />
             </div>
+
+            {drawer.mode === 'edit' && (
+              <div style={{ marginBottom: 18 }}>
+                <Toggle active={!!d.no_show} label={d.no_show ? '⚠ Marcado: no llegó' : 'Marcar: no llegó'}
+                  onClick={() => setDrawer(dr => ({ ...dr, data: { ...dr.data, no_show: !dr.data.no_show } }))} />
+              </div>
+            )}
 
             {/* Confirmación por WhatsApp */}
             {phone && (
@@ -326,14 +412,24 @@ function FragmentRow({ hour, courts, past, cellReservation, openNew, openEdit })
         const name = r.customer_name || r.profiles?.full_name || 'Reserva'
         return (
           <div key={c.id} className={`cal-cell ${cls}`} onClick={() => openEdit(r)}
-            title={name + (r.notes ? `\n📝 ${r.notes}` : '')} style={{ position: 'relative' }}>
+            title={name + (r.notes ? `\n📝 ${r.notes}` : '')} style={{ position: 'relative', opacity: r.no_show ? 0.5 : 1 }}>
             {r.notes && <span style={{ position: 'absolute', top: 2, right: 4, fontSize: 9 }}>📝</span>}
-            {r.status === 'blocked' ? 'Bloqueado' : name.split(' ')[0]}
+            {r.recurrence_group && <span style={{ position: 'absolute', top: 2, left: 4, fontSize: 9 }}>🔁</span>}
+            {r.status === 'blocked' ? 'Bloqueado' : (r.no_show ? '❌ ' : '') + name.split(' ')[0]}
             <div style={{ fontSize: 9, opacity: 0.75 }}>{r.status === 'blocked' ? '' : r.price ? `$${Number(r.price).toLocaleString()}${r.is_paid ? ' ✓' : ''}` : r.is_paid ? 'Pagado' : 'Pend. pago'}</div>
           </div>
         )
       })}
     </>
+  )
+}
+
+function CajaCard({ label, value, lime }) {
+  return (
+    <div className="card" style={{ padding: '12px 14px' }}>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>{label}</div>
+      <div className="oswald" style={{ fontSize: 20, fontWeight: 700, color: lime ? 'var(--lime)' : 'var(--white)' }}>{value}</div>
+    </div>
   )
 }
 

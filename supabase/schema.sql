@@ -209,6 +209,8 @@ create table public.reservations (
   is_paid       boolean not null default false,
   price         numeric(10,2),
   customer_phone text,
+  no_show       boolean not null default false,
+  recurrence_group uuid,                                  -- reservas recurrentes ligadas
   notes         text,
   created_by    uuid references public.profiles(id),
   created_at    timestamptz not null default now(),
@@ -226,6 +228,18 @@ create table public.reservation_messages (
   body           text not null,
   created_by     uuid references public.profiles(id),
   created_at     timestamptz not null default now()
+);
+
+-- Lista de espera: "avísame si se libera este horario"
+create table public.reservation_waitlist (
+  id         bigint generated always as identity primary key,
+  court_id   bigint not null references public.courts(id) on delete cascade,
+  member_id  uuid not null references public.profiles(id) on delete cascade,
+  starts_at  timestamptz not null,
+  ends_at    timestamptz not null,
+  notified   boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (court_id, member_id, starts_at)
 );
 
 -- Disponibilidad para el cliente SIN exponer nombres de otros socios.
@@ -383,6 +397,17 @@ create policy "ver avisos de mi reserva o staff" on public.reservation_messages
   );
 create policy "staff administra avisos reserva" on public.reservation_messages
   for all using (public.is_staff());
+
+-- reservation_waitlist
+alter table public.reservation_waitlist enable row level security;
+create policy "ver mi espera o staff" on public.reservation_waitlist
+  for select using (member_id = auth.uid() or public.is_staff());
+create policy "anotarme en espera" on public.reservation_waitlist
+  for insert with check (member_id = auth.uid());
+create policy "salir de espera o staff" on public.reservation_waitlist
+  for delete using (member_id = auth.uid() or public.is_staff());
+create policy "staff actualiza espera" on public.reservation_waitlist
+  for update using (public.is_staff());
 
 -- tournament_matches / tournament_messages
 alter table public.tournament_matches  enable row level security;

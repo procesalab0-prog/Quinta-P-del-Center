@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth.jsx'
-import { MONTH_SHORT, timeAgo } from '../lib/util'
+import { MONTH_SHORT, timeAgo, DAY_SHORT } from '../lib/util'
 import { MATCH_EMBED, opponentName, fmtMatchTime } from '../lib/torneo'
 import Countdown from '../components/Countdown.jsx'
 
@@ -11,6 +11,7 @@ export default function Inicio({ goTo, openDetail }) {
   const [avisos, setAvisos] = useState([])
   const [courtCount, setCourtCount] = useState(null)
   const [miPartido, setMiPartido] = useState(null) // {match, regId}
+  const [miReserva, setMiReserva] = useState(null) // próxima reserva
 
   useEffect(() => {
     supabase.from('tournaments').select('*').eq('is_published', true)
@@ -40,6 +41,15 @@ export default function Inicio({ goTo, openDetail }) {
       }
     }
     loadMiPartido()
+
+    // Mi próxima reserva (con sus avisos)
+    supabase.from('reservations')
+      .select('*, courts(name), reservation_messages(id, body, created_at)')
+      .eq('member_id', session.user.id)
+      .gte('ends_at', new Date().toISOString())
+      .neq('status', 'cancelled')
+      .order('starts_at').limit(1)
+      .then(({ data }) => setMiReserva(data?.[0] ?? null))
   }, [])
 
   return (
@@ -63,6 +73,31 @@ export default function Inicio({ goTo, openDetail }) {
         <button className="btn-lime" style={{ flex: 1, fontSize: 12.5, padding: '13px 6px' }} onClick={() => goTo('tarjeta')}>Ver mi tarjeta</button>
         <button className="btn-outline" style={{ flex: 1, fontSize: 12.5, padding: '13px 6px' }} onClick={() => goTo('reservas')}>Reservar cancha</button>
       </div>
+
+      {/* Tu próxima reserva */}
+      {miReserva && (() => {
+        const s = new Date(miReserva.starts_at), e = new Date(miReserva.ends_at)
+        const hhmm = (x) => `${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`
+        const horas = (s - Date.now()) / 3600000
+        const pronto = horas > 0 && horas <= 24
+        const avisos = (miReserva.reservation_messages ?? [])
+        return (
+          <div onClick={() => goTo('reservas')}
+            style={{ background: 'var(--surf)', border: `1px solid ${pronto ? 'rgba(244,211,94,0.5)' : 'var(--line)'}`, borderRadius: 16, padding: 16, marginBottom: 24, cursor: 'pointer' }}>
+            <div className="h-section" style={{ fontSize: 14, marginBottom: 8 }}>📅 Tu próxima reserva</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>{miReserva.courts?.name ?? 'Cancha'}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
+              {DAY_SHORT[s.getDay()]} {s.getDate()} · {hhmm(s)}–{hhmm(e)}
+              {miReserva.price ? ` · $${Number(miReserva.price).toLocaleString()}` : ''}
+              {miReserva.is_paid ? ' · pagada' : ''}
+            </div>
+            {pronto && <div style={{ marginTop: 8, display: 'inline-block', background: 'rgba(244,211,94,0.14)', color: '#F4D35E', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 999 }}>⏰ ¡Es pronto! {horas < 1 ? 'En menos de 1 h' : `En ~${Math.round(horas)} h`}</div>}
+            {avisos.map(a => (
+              <div key={a.id} style={{ marginTop: 8, background: 'rgba(215,242,60,0.08)', border: '1px solid rgba(215,242,60,0.25)', borderRadius: 10, padding: '8px 10px', fontSize: 12.5 }}>📣 {a.body}</div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* Tu próximo partido de torneo */}
       {miPartido && (
