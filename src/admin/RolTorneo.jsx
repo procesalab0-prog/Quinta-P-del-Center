@@ -18,7 +18,7 @@ export default function RolTorneo({ torneo, onClose }) {
   async function load() {
     const [m, r, c, ms] = await Promise.all([
       supabase.from('tournament_matches').select(MATCH_EMBED).eq('tournament_id', torneo.id).order('starts_at', { nullsFirst: false }),
-      supabase.from('tournament_registrations').select('id, partner_name, category, profiles(full_name, phone), partner:profiles!tournament_registrations_partner_member_id_fkey(full_name)').eq('tournament_id', torneo.id).order('created_at'),
+      supabase.from('tournament_registrations').select('id, partner_name, category, profiles:profiles!tournament_registrations_member_id_fkey(full_name, phone), partner:profiles!tournament_registrations_partner_member_id_fkey(full_name)').eq('tournament_id', torneo.id).order('created_at'),
       supabase.from('courts').select('*').eq('is_active', true).order('id'),
       supabase.from('tournament_messages').select('*').eq('tournament_id', torneo.id).order('created_at', { ascending: false }),
     ])

@@ -122,7 +122,7 @@ export default function TorneosAdmin() {
   async function verInscritos(t) {
     const [{ data }, { data: matches }] = await Promise.all([
       supabase.from('tournament_registrations')
-        .select('*, profiles(full_name, phone), partner:profiles!tournament_registrations_partner_member_id_fkey(full_name, phone)')
+        .select('*, profiles:profiles!tournament_registrations_member_id_fkey(full_name, phone), partner:profiles!tournament_registrations_partner_member_id_fkey(full_name, phone)')
         .eq('tournament_id', t.id).order('created_at'),
       supabase.from('tournament_matches').select(MATCH_EMBED).eq('tournament_id', t.id),
     ])

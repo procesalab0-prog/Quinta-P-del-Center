@@ -5,7 +5,7 @@ export const ROUNDS = ['Grupos', 'Octavos', 'Cuartos', 'Semifinal', 'Final']
 // Embed de PostgREST para traer los nombres de las parejas de cada partido.
 // tournament_matches tiene dos FKs a tournament_registrations: hay que nombrarlas.
 const REG_FIELDS = `id, partner_name,
- profiles(full_name, phone),
+ profiles:profiles!tournament_registrations_member_id_fkey(full_name, phone),
  partner:profiles!tournament_registrations_partner_member_id_fkey(full_name, phone)`
 
 export const MATCH_EMBED = `*, courts(name),
