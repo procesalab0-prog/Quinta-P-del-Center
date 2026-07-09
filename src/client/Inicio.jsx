@@ -25,7 +25,7 @@ export default function Inicio({ goTo, openDetail }) {
     // Mi próximo partido de torneo (si estoy inscrito y ya hay rol de juego)
     async function loadMiPartido() {
       const { data: regs } = await supabase.from('tournament_registrations')
-        .select('id').eq('member_id', session.user.id)
+        .select('id').or(`member_id.eq.${session.user.id},partner_member_id.eq.${session.user.id}`)
       if (!regs?.length) return
       const ids = regs.map(r => r.id).join(',')
       const { data: m } = await supabase.from('tournament_matches')

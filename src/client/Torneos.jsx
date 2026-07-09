@@ -14,16 +14,23 @@ export default function Torneos({ openEvent, onConsumeOpen }) {
   const [regs, setRegs] = useState({}) // tournament_id -> registration
   const [detail, setDetail] = useState(null) // { item, kind }
   const [signup, setSignup] = useState(null) // torneo abierto en el formulario
-  const [partner, setPartner] = useState('')
+  const [partner, setPartner] = useState('')       // nombre libre
+  const [partnerMode, setPartnerMode] = useState('cuenta') // 'cuenta' | 'libre'
+  const [partnerMemberId, setPartnerMemberId] = useState('')
+  const [partnerSearch, setPartnerSearch] = useState('')
+  const [partnerResults, setPartnerResults] = useState([])
   const [cat, setCat] = useState('')
   const [busy, setBusy] = useState(false)
+
+  const uid = session.user.id
 
   async function load() {
     const [t, a, r] = await Promise.all([
       supabase.from('tournaments').select('*').eq('is_published', true).order('starts_at'),
       supabase.from('announcements').select('*').eq('is_published', true)
         .order('is_pinned', { ascending: false }).order('created_at', { ascending: false }),
-      supabase.from('tournament_registrations').select('*').eq('member_id', session.user.id),
+      // Mis inscripciones: como titular O como pareja ligada
+      supabase.from('tournament_registrations').select('*').or(`member_id.eq.${uid},partner_member_id.eq.${uid}`),
     ])
     setTournaments(t.data ?? [])
     setAvisos(a.data ?? [])
@@ -31,6 +38,17 @@ export default function Torneos({ openEvent, onConsumeOpen }) {
     return { tournaments: t.data ?? [], avisos: a.data ?? [] }
   }
   useEffect(() => { load() }, [])
+
+  // Búsqueda de socios para elegir pareja registrada
+  useEffect(() => {
+    if (partnerMode !== 'cuenta' || partnerSearch.trim().length < 2) { setPartnerResults([]); return }
+    let cancel = false
+    const id = setTimeout(async () => {
+      const { data } = await supabase.rpc('search_members', { p_q: partnerSearch.trim() })
+      if (!cancel) setPartnerResults(data ?? [])
+    }, 250)
+    return () => { cancel = true; clearTimeout(id) }
+  }, [partnerSearch, partnerMode])
 
   // Abrir directo un torneo/aviso al llegar desde Inicio
   useEffect(() => {
@@ -46,17 +64,24 @@ export default function Torneos({ openEvent, onConsumeOpen }) {
   async function inscribir(e) {
     e.preventDefault()
     setBusy(true)
+    const usaCuenta = partnerMode === 'cuenta' && partnerMemberId
     const { error } = await supabase.from('tournament_registrations').insert({
       tournament_id: signup.id, member_id: session.user.id,
-      partner_name: partner.trim() || null, category: cat || null,
+      partner_member_id: usaCuenta ? partnerMemberId : null,
+      partner_name: usaCuenta ? null : (partner.trim() || null),
+      category: cat || null,
     })
     setBusy(false)
-    if (!error) { setSignup(null); setPartner(''); setCat(''); setDetail(null); load() }
+    if (!error) { closeSignup(); setDetail(null); load() }
     else alert('No se pudo inscribir: ' + error.message)
   }
 
   function startInscribir(t) {
     setSignup(t); setCat(t.categories?.[0] ?? '')
+    setPartner(''); setPartnerMode('cuenta'); setPartnerMemberId(''); setPartnerSearch(''); setPartnerResults([])
+  }
+  function closeSignup() {
+    setSignup(null); setPartner(''); setPartnerMemberId(''); setPartnerSearch(''); setPartnerResults([]); setCat('')
   }
 
   return (
@@ -145,7 +170,7 @@ export default function Torneos({ openEvent, onConsumeOpen }) {
 
       {/* Formulario de inscripción */}
       {signup && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 80 }} onClick={() => setSignup(null)}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 80 }} onClick={closeSignup}>
           <form onSubmit={inscribir} onClick={e => e.stopPropagation()}
             style={{ width: '100%', maxWidth: 430, background: 'var(--surf)', borderRadius: '20px 20px 0 0', padding: 22, borderTop: '1px solid rgba(215,242,60,0.3)' }}>
             <div className="h-section" style={{ marginBottom: 4 }}>Inscripción</div>
@@ -158,11 +183,52 @@ export default function Torneos({ openEvent, onConsumeOpen }) {
                 </select>
               </>
             )}
-            <div className="field-label">Nombre de tu pareja (opcional)</div>
-            <input className="input" value={partner} onChange={e => setPartner(e.target.value)} placeholder="Ej. Ana López" style={{ marginBottom: 18 }} />
+            <div className="field-label">Tu pareja</div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <button type="button" className={`tab-btn ${partnerMode === 'cuenta' ? 'active' : ''}`} style={{ padding: '8px' }}
+                onClick={() => { setPartnerMode('cuenta'); setPartner('') }}>Tiene cuenta</button>
+              <button type="button" className={`tab-btn ${partnerMode === 'libre' ? 'active' : ''}`} style={{ padding: '8px' }}
+                onClick={() => { setPartnerMode('libre'); setPartnerMemberId(''); setPartnerSearch('') }}>Solo nombre</button>
+            </div>
+
+            {partnerMode === 'cuenta' ? (
+              <div style={{ marginBottom: 18 }}>
+                {partnerMemberId ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(215,242,60,0.1)', border: '1px solid rgba(215,242,60,0.4)', borderRadius: 8, padding: '10px 12px' }}>
+                    <span style={{ fontSize: 13 }}>✓ {partnerResults.find(r => r.id === partnerMemberId)?.full_name || partnerSearch}</span>
+                    <span style={{ color: 'var(--muted)', cursor: 'pointer' }} onClick={() => { setPartnerMemberId(''); setPartnerSearch('') }}>✕</span>
+                  </div>
+                ) : (
+                  <>
+                    <input className="input" value={partnerSearch} onChange={e => setPartnerSearch(e.target.value)} placeholder="Busca a tu pareja por nombre…" />
+                    {partnerResults.length > 0 && (
+                      <div className="card" style={{ marginTop: 6, overflow: 'hidden' }}>
+                        {partnerResults.map(r => (
+                          <div key={r.id} onClick={() => setPartnerMemberId(r.id)}
+                            style={{ padding: '10px 12px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid var(--line-soft)' }}>
+                            {r.full_name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {partnerSearch.trim().length >= 2 && partnerResults.length === 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 6 }}>
+                        Sin resultados. Si tu pareja no tiene cuenta, usa "Solo nombre".
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 6 }}>
+                      Al ligarla, los avisos del torneo también le llegarán a tu pareja.
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <input className="input" value={partner} onChange={e => setPartner(e.target.value)} placeholder="Ej. Ana López" style={{ marginBottom: 18 }} />
+            )}
+
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn-lime" disabled={busy} style={{ flex: 1 }}>{busy ? '…' : 'Confirmar'}</button>
-              <button type="button" className="btn-outline" style={{ flex: 1 }} onClick={() => setSignup(null)}>Cancelar</button>
+              <button type="button" className="btn-outline" style={{ flex: 1 }} onClick={closeSignup}>Cancelar</button>
             </div>
           </form>
         </div>

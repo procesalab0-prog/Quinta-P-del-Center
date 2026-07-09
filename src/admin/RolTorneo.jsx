@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { timeAgo } from '../lib/util'
-import { ROUNDS, MATCH_EMBED, pairName, fmtMatchTime } from '../lib/torneo'
+import { ROUNDS, MATCH_EMBED, pairName, fmtMatchTime, matchWaMsg, waLink, pairRecipients } from '../lib/torneo'
 
 // Gestión del rol de juego y mensajes de un torneo (admin).
 export default function RolTorneo({ torneo, onClose }) {
@@ -18,7 +18,7 @@ export default function RolTorneo({ torneo, onClose }) {
   async function load() {
     const [m, r, c, ms] = await Promise.all([
       supabase.from('tournament_matches').select(MATCH_EMBED).eq('tournament_id', torneo.id).order('starts_at', { nullsFirst: false }),
-      supabase.from('tournament_registrations').select('id, partner_name, category, profiles(full_name, phone)').eq('tournament_id', torneo.id).order('created_at'),
+      supabase.from('tournament_registrations').select('id, partner_name, category, profiles(full_name, phone), partner:profiles!tournament_registrations_partner_member_id_fkey(full_name)').eq('tournament_id', torneo.id).order('created_at'),
       supabase.from('courts').select('*').eq('is_active', true).order('id'),
       supabase.from('tournament_messages').select('*').eq('tournament_id', torneo.id).order('created_at', { ascending: false }),
     ])
@@ -197,6 +197,24 @@ export default function RolTorneo({ torneo, onClose }) {
                       <span style={{ color: m.winner === 2 ? 'var(--lime)' : 'var(--white)' }}>{m.winner === 2 ? '🏆 ' : ''}{pairName(m.pair2, m.pair2_label)}</span>
                       {m.score && <span style={{ color: 'var(--muted)', fontWeight: 500, marginLeft: 10, fontSize: 13 }}>{m.score}</span>}
                     </div>
+                    {/* Confirmar por WhatsApp a cada persona de las dos parejas */}
+                    {m.status !== 'cancelled' && (() => {
+                      const gente = [
+                        ...pairRecipients(m.pair1).map(r => ({ ...r, side: 1 })),
+                        ...pairRecipients(m.pair2).map(r => ({ ...r, side: 2 })),
+                      ]
+                      if (!gente.length) return null
+                      return (
+                        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                          {gente.map((r, i) => (
+                            <a key={i} href={waLink(r.phone, matchWaMsg(torneo.title, m, r.side, r.name))} target="_blank" rel="noreferrer"
+                              style={{ background: '#25D366', color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 999, textDecoration: 'none' }}>
+                              📲 {r.name}
+                            </a>
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </div>
                   <div style={{ display: 'flex', gap: 12, flexShrink: 0, fontSize: 14, color: 'var(--muted)' }}>
                     <span style={{ cursor: 'pointer' }} onClick={() => editMatch(m)}>✎</span>

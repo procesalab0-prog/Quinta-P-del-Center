@@ -139,15 +139,26 @@ create table public.tournaments (
 );
 
 create table public.tournament_registrations (
-  id            bigint generated always as identity primary key,
-  tournament_id bigint not null references public.tournaments(id) on delete cascade,
-  member_id     uuid not null references public.profiles(id) on delete cascade,
-  partner_name  text,
-  category      text,
-  is_paid       boolean not null default false,
-  created_at    timestamptz not null default now(),
+  id                bigint generated always as identity primary key,
+  tournament_id     bigint not null references public.tournaments(id) on delete cascade,
+  member_id         uuid not null references public.profiles(id) on delete cascade,
+  partner_member_id uuid references public.profiles(id),  -- pareja con cuenta (opcional)
+  partner_name      text,                                 -- pareja sin cuenta (texto)
+  category          text,
+  is_paid           boolean not null default false,
+  created_at        timestamptz not null default now(),
   unique (tournament_id, member_id)
 );
+
+-- Buscador de socios para elegir pareja (solo id + nombre, sin teléfono)
+create or replace function public.search_members(p_q text)
+returns table (id uuid, full_name text)
+language sql stable security definer set search_path = public as $$
+  select p.id, p.full_name from profiles p
+  where auth.uid() is not null and p.is_active and p.id <> auth.uid()
+    and coalesce(p.full_name, '') <> '' and p.full_name ilike '%' || p_q || '%'
+  order by p.full_name limit 8
+$$;
 
 -- Rol de juego del torneo (partidos programados y resultados)
 create table public.tournament_matches (
@@ -339,7 +350,7 @@ create policy "admin administra torneos" on public.tournaments
 
 -- tournament_registrations
 create policy "ver mi inscripcion o staff" on public.tournament_registrations
-  for select using (member_id = auth.uid() or public.is_staff());
+  for select using (member_id = auth.uid() or partner_member_id = auth.uid() or public.is_staff());
 create policy "inscribirme yo mismo" on public.tournament_registrations
   for insert with check (
     member_id = auth.uid()
