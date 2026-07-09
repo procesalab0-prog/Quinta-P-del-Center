@@ -273,6 +273,13 @@ export default function ReservasAdmin() {
         </div>
       )}
 
+      <div className="cal-legend">
+        <span><span className="dot" style={{ background: '#7CB518' }} />Pagada</span>
+        <span><span className="dot" style={{ background: 'rgba(124,181,24,0.14)', border: '1.5px solid #7CB518' }} />Confirmada (falta pago)</span>
+        <span><span className="dot" style={{ background: 'rgba(244,211,94,0.16)', border: '1.5px solid #F4D35E' }} />Por confirmar</span>
+        <span><span className="dot" style={{ background: 'rgba(226,87,76,0.14)', border: '1.5px dashed #E2574C' }} />Bloqueo</span>
+      </div>
+
       <div style={{ overflowX: 'auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${courts.length}, minmax(110px, 1fr))`, gap: 6, minWidth: courts.length * 120 + 70 }}>
           <div />
@@ -446,7 +453,10 @@ function FragmentRow({ hour, courts, past, cellReservation, openNew, openEdit })
           <div key={c.id} className="cal-cell" onClick={() => openNew(c.id, hour)}
             style={past ? { opacity: 0.4, cursor: 'default', background: '#0d0f0b' } : undefined} />
         )
-        const cls = r.status === 'blocked' ? 'blocked' : r.is_paid ? 'paid' : 'pending'
+        const cls = r.status === 'blocked' ? 'blocked'
+          : r.is_paid ? 'paid'
+            : r.status === 'pending' ? 'pend-confirm'
+              : 'confirm-unpaid'
         const name = r.customer_name || r.profiles?.full_name || 'Reserva'
         return (
           <div key={c.id} className={`cal-cell ${cls}`} onClick={() => openEdit(r)}
@@ -454,7 +464,7 @@ function FragmentRow({ hour, courts, past, cellReservation, openNew, openEdit })
             {r.notes && <span style={{ position: 'absolute', top: 2, right: 4, fontSize: 9 }}>📝</span>}
             {r.recurrence_group && <span style={{ position: 'absolute', top: 2, left: 4, fontSize: 9 }}>🔁</span>}
             {r.status === 'blocked' ? 'Bloqueado' : (r.no_show ? '❌ ' : '') + name.split(' ')[0]}
-            <div style={{ fontSize: 9, opacity: 0.75 }}>{r.status === 'blocked' ? '' : r.price ? `$${Number(r.price).toLocaleString()}${r.is_paid ? ' ✓' : ''}` : r.is_paid ? 'Pagado' : 'Pend. pago'}</div>
+            <div style={{ fontSize: 9, opacity: 0.85 }}>{r.status === 'blocked' ? '' : r.status === 'pending' ? 'Por confirmar' : r.is_paid ? `Pagada${r.price ? ` $${Number(r.price).toLocaleString()}` : ''}` : 'Falta pago'}</div>
           </div>
         )
       })}

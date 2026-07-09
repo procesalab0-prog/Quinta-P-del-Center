@@ -133,24 +133,30 @@ export default function Reservas() {
             const d = new Date(r.starts_at)
             const end = new Date(r.ends_at)
             const hhmm = (x) => `${String(x.getHours()).padStart(2, '0')}:${String(x.getMinutes()).padStart(2, '0')}`
-            const estado = r.status === 'confirmed'
-              ? { txt: 'Confirmada', color: 'var(--lime)' }
-              : r.status === 'blocked'
-                ? { txt: 'Bloqueo', color: 'var(--muted)' }
-                : { txt: 'Por confirmar', color: '#F4D35E' }
+            const estado = r.status === 'blocked'
+              ? { txt: 'Bloqueo', color: 'var(--muted)', fill: false }
+              : r.is_paid
+                ? { txt: 'Pagada ✓', color: '#7CB518', fill: true }
+                : r.status === 'confirmed'
+                  ? { txt: 'Confirmada · falta pago', color: '#7CB518', fill: false }
+                  : { txt: 'Por confirmar', color: '#F4D35E', fill: false }
             const avisos = (r.reservation_messages ?? []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
             return (
-              <div key={r.id} className="card" style={{ padding: 14, marginBottom: 10 }}>
+              <div key={r.id} className="card" style={{ padding: 14, marginBottom: 10, borderColor: estado.color === 'var(--muted)' ? undefined : estado.color }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{r.courts?.name ?? 'Cancha'}</div>
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
                       {DAY_SHORT[d.getDay()]} {d.getDate()} · {hhmm(d)}–{hhmm(end)}
                       {r.price ? ` · $${Number(r.price).toLocaleString()}` : ''}
-                      {r.is_paid ? ' · pagada' : ''}
                     </div>
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: estado.color, border: `1px solid ${estado.color}`, borderRadius: 999, padding: '5px 10px', whiteSpace: 'nowrap' }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, borderRadius: 999, padding: '5px 10px', whiteSpace: 'nowrap',
+                    background: estado.fill ? estado.color : 'transparent',
+                    color: estado.fill ? '#101110' : estado.color,
+                    border: `1px solid ${estado.color}`,
+                  }}>
                     {estado.txt}
                   </div>
                 </div>

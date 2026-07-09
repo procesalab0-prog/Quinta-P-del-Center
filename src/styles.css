@@ -160,9 +160,14 @@ input, select, textarea, button { font-family: 'Inter', sans-serif; }
 }
 
 .cal-cell { border-radius: 8px; padding: 10px 6px; text-align: center; font-size: 11px; min-height: 20px; background: #161811; border: 1px solid rgba(255,255,255,0.05); color: #3a3d35; cursor: pointer; }
-.cal-cell.paid { background: var(--lime); color: #101110; font-weight: 600; border-color: var(--lime); }
-.cal-cell.pending { background: transparent; border: 1.5px solid var(--lime); color: var(--lime); font-weight: 600; }
-.cal-cell.blocked { background: rgba(255,255,255,0.07); color: var(--muted); font-weight: 600; border-style: dashed; }
+/* Colores por estado, visibles desde el calendario sin abrir la reserva */
+.cal-cell.paid { background: #7CB518; color: #101110; font-weight: 700; border-color: #7CB518; }               /* pagada = verde sólido */
+.cal-cell.confirm-unpaid { background: rgba(124,181,24,0.14); border: 1.5px solid #7CB518; color: #9BE04A; font-weight: 700; } /* confirmada, falta pago = verde contorno */
+.cal-cell.pend-confirm { background: rgba(244,211,94,0.16); border: 1.5px solid #F4D35E; color: #F4D35E; font-weight: 700; }    /* por confirmar = amarillo */
+.cal-cell.blocked { background: rgba(226,87,76,0.14); color: #E2574C; font-weight: 700; border: 1.5px solid rgba(226,87,76,0.5); border-style: dashed; } /* bloqueo = rojo */
+
+.cal-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+.cal-legend .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; margin-right: 5px; vertical-align: middle; }
 
 .table-head { display: grid; padding: 12px 16px; font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--line-soft); }
 .table-row { display: grid; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
