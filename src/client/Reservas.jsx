@@ -95,9 +95,9 @@ export default function Reservas() {
     const { start, end } = slotDates(dayStr, hour, slotMinutes)
     const isMine = mine.some(r => r.court_id === courtId && new Date(r.starts_at) < end && new Date(r.ends_at) > start)
     if (isMine) return 'mine'
+    if (start < new Date()) return 'past'   // ya pasó: ni reservar ni lista de espera
     const occ = occupied.some(o => o.court_id === courtId && new Date(o.starts_at) < end && new Date(o.ends_at) > start)
     if (occ) return 'occupied'
-    if (start < new Date()) return 'occupied' // horas pasadas
     return 'free'
   }
 
@@ -187,16 +187,20 @@ export default function Reservas() {
         {HOURS.map(h => {
           const st = slotState(h)
           const waiting = st === 'occupied' && inWaitlist(h)
+          const dim = st === 'past'
           return (
-            <div key={h} className={`slot ${st === 'occupied' ? 'occupied' : ''} ${st === 'mine' || (slot === h && st === 'free') ? 'mine' : ''}`}
-              style={waiting ? { borderColor: '#F4D35E', color: '#F4D35E' } : undefined}
+            <div key={h} className={`slot ${st === 'occupied' || st === 'past' ? 'occupied' : ''} ${st === 'mine' || (slot === h && st === 'free') ? 'mine' : ''}`}
+              style={{ ...(waiting ? { borderColor: '#F4D35E', color: '#F4D35E' } : {}), ...(dim ? { opacity: 0.4, cursor: 'default' } : {}) }}
               onClick={() => {
                 if (st === 'free') { setSlot(h); setConfirmed(false) }
                 else if (st === 'occupied') toggleWaitlist(h)
               }}>
               <div className="slot-h">{h}</div>
               <div className="slot-l">
-                {st === 'mine' ? 'Tu reserva' : st === 'occupied' ? (waiting ? '⏳ En espera' : 'Ocupado · avísame') : slot === h ? 'Seleccionado' : 'Disponible'}
+                {st === 'mine' ? 'Tu reserva'
+                  : st === 'past' ? 'Ya pasó'
+                    : st === 'occupied' ? (waiting ? '⏳ En espera' : 'Ocupado · avísame')
+                      : slot === h ? 'Seleccionado' : 'Disponible'}
               </div>
             </div>
           )

@@ -29,6 +29,8 @@ export default function ReservasAdmin() {
     return { cobrado, pendiente, total: cobrado + pendiente, count: activas.length }
   }, [reservas])
 
+  const waitlistFuture = useMemo(() => waitlist.filter(w => new Date(w.ends_at) > new Date()), [waitlist])
+
   useEffect(() => {
     supabase.from('courts').select('*').eq('is_active', true).order('id').then(({ data }) => setCourts(data ?? []))
     supabase.from('profiles').select('id, full_name, phone').eq('is_active', true).order('full_name')
@@ -150,13 +152,47 @@ export default function ReservasAdmin() {
   }
 
   async function cancelar() {
-    await supabase.from('reservations').update({ status: 'cancelled' }).eq('id', drawer.data.id)
-    setDrawer(null); load()
+    const r = drawer.data
+    await supabase.from('reservations').update({ status: 'cancelled' }).eq('id', r.id)
+    setDrawer(null)
+    await load()
+    // ¿Alguien esperaba este horario? (cualquier cancha, solo futuros)
+    const esperando = waitlist.filter(w =>
+      new Date(w.ends_at) > new Date() &&
+      new Date(w.starts_at) < new Date(r.ends_at) && new Date(w.ends_at) > new Date(r.starts_at))
+    if (esperando.length > 0) {
+      alert(`Se liberó este horario y hay ${esperando.length} en lista de espera. Revisa el panel "Lista de espera" para asignarlo con un toque.`)
+    }
   }
 
   async function quitarEspera(id) {
     await supabase.from('reservation_waitlist').delete().eq('id', id)
     load()
+  }
+
+  // Asigna a un socio de la lista de espera: le crea la reserva en una cancha
+  // libre a esa hora y le avisa por su app.
+  async function asignarEspera(w) {
+    const start = new Date(w.starts_at), end = new Date(w.ends_at)
+    const { data: overlap } = await supabase.from('reservations')
+      .select('court_id').lt('starts_at', end.toISOString()).gt('ends_at', start.toISOString()).neq('status', 'cancelled')
+    const ocupadas = new Set((overlap ?? []).map(r => r.court_id))
+    const court = !ocupadas.has(w.court_id) ? w.court_id : courts.find(c => !ocupadas.has(c.id))?.id
+    if (!court) { alert('No hay ninguna cancha libre a esa hora.'); return }
+    const { data: nueva, error } = await supabase.from('reservations').insert({
+      court_id: court, member_id: w.member_id,
+      starts_at: w.starts_at, ends_at: w.ends_at, status: 'confirmed', is_paid: false,
+      price: defaultPrice || null,
+    }).select().single()
+    if (error) { alert('No se pudo asignar: ' + error.message); return }
+    const cancha = courts.find(c => c.id === court)?.name
+    await supabase.from('reservation_messages').insert({
+      reservation_id: nueva.id,
+      body: `¡Se liberó tu horario! 🎾 Tu reserva quedó confirmada en ${cancha}, ${hourOf(w.starts_at)}–${hourOf(w.ends_at)}. ¡Te esperamos!`,
+    })
+    await supabase.from('reservation_waitlist').delete().eq('id', w.id)
+    load()
+    alert(`Reserva creada para ${w.profiles?.full_name || 'el socio'} en ${cancha}. Le llegó el aviso a su app.`)
   }
 
   async function enviarAviso() {
@@ -216,16 +252,18 @@ export default function ReservasAdmin() {
         <CajaCard label="Total del día" value={`$${caja.total.toLocaleString()}`} />
       </div>
 
-      {/* Lista de espera del día */}
-      {waitlist.length > 0 && (
+      {/* Lista de espera del día (solo horarios que no han pasado) */}
+      {waitlistFuture.length > 0 && (
         <div className="card" style={{ padding: 12, marginBottom: 14, borderColor: 'rgba(244,211,94,0.4)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#F4D35E', marginBottom: 8 }}>⏳ Lista de espera ({waitlist.length})</div>
-          {waitlist.map(w => (
-            <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12, padding: '4px 0' }}>
-              <span>{w.profiles?.full_name} · {courts.find(c => c.id === w.court_id)?.name} · {hourOf(w.starts_at)}–{hourOf(w.ends_at)}</span>
-              <span style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#F4D35E', marginBottom: 8 }}>⏳ Lista de espera ({waitlistFuture.length})</div>
+          {waitlistFuture.map(w => (
+            <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 12, padding: '6px 0', borderBottom: '1px solid var(--line-soft)', flexWrap: 'wrap' }}>
+              <span>{w.profiles?.full_name} · pidió {courts.find(c => c.id === w.court_id)?.name} · {hourOf(w.starts_at)}–{hourOf(w.ends_at)}</span>
+              <span style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+                <button className="btn-lime" style={{ width: 'auto', padding: '5px 12px', borderRadius: 999, fontSize: 11, fontFamily: 'Inter', textTransform: 'none', letterSpacing: 0 }}
+                  onClick={() => asignarEspera(w)}>✓ Asignar</button>
                 {w.profiles?.phone && (
-                  <a href={waLink(w.profiles.phone, `Hola ${(w.profiles.full_name || '').split(' ')[0]}! 🎾 Se liberó el horario que esperabas en Quinta Padel Center (${courts.find(c => c.id === w.court_id)?.name}, ${hourOf(w.starts_at)}). ¿Lo quieres?`)}
+                  <a href={waLink(w.profiles.phone, `Hola ${(w.profiles.full_name || '').split(' ')[0]}! 🎾 Se liberó el horario que esperabas en Quinta Padel Center (${hourOf(w.starts_at)}). ¿Lo quieres?`)}
                     target="_blank" rel="noreferrer" style={{ color: '#25D366', textDecoration: 'none', fontWeight: 700 }}>WhatsApp</a>
                 )}
                 <span style={{ cursor: 'pointer', color: 'var(--muted)' }} onClick={() => quitarEspera(w.id)}>✕</span>
@@ -315,8 +353,8 @@ export default function ReservasAdmin() {
 
             <div className="field-label">Estado</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-              {[['confirmed', 'Confirmada'], ['pending', 'Pendiente'], ['blocked', 'Bloqueo']].map(([v, l]) => (
-                <Toggle key={v} active={d.status === v} label={l}
+              {[['confirmed', 'Confirmada', '#7CB518'], ['pending', 'Pendiente', '#F4D35E'], ['blocked', 'Bloqueo', '#E2574C']].map(([v, l, color]) => (
+                <Toggle key={v} active={d.status === v} label={l} color={color}
                   onClick={() => setDrawer(dr => ({ ...dr, data: { ...dr.data, status: v } }))} />
               ))}
             </div>
@@ -433,13 +471,14 @@ function CajaCard({ label, value, lime }) {
   )
 }
 
-function Toggle({ active, label, onClick }) {
+function Toggle({ active, label, onClick, color }) {
+  const c = color || '#D7F23C'
   return (
     <div onClick={onClick} style={{
-      cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 8,
-      background: active ? 'rgba(215,242,60,0.14)' : 'transparent',
-      border: active ? '1px solid var(--lime)' : '1px solid rgba(255,255,255,0.15)',
-      color: active ? 'var(--lime)' : 'var(--muted)',
+      cursor: 'pointer', fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 8,
+      background: active ? c : 'transparent',
+      border: `1px solid ${active ? c : 'rgba(255,255,255,0.15)'}`,
+      color: active ? '#101110' : 'var(--muted)',
     }}>{label}</div>
   )
 }
